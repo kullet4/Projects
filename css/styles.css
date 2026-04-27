@@ -1,0 +1,307 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
+/* Main Stylesheet for E-LMS - Grade 1-6 Friendly Edition */
+body {
+    background-color: #f0f4f8; /* Softer, slightly blue-tinted background */
+    font-family: 'Nunito', sans-serif; /* Friendly, rounded, highly readable font */
+    color: #4a4a4a;
+}
+
+/* Enhancing Readability & Accessibility */
+h1, h2, h3, h4, h5, h6 {
+    color: #2c3e50;
+    font-weight: 800; /* Made slightly heavier for that chunky cartoon feel */
+}
+
+/* Global Elements styling to make them bouncy and kid-friendly */
+.card {
+    border-radius: 1.5rem; /* Make it more pronounced */
+    border: none;
+    box-shadow: 0 8px 0 rgba(0, 0, 0, 0.05) !important; /* Thick bottom shadow like Duolingo blocks */
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Kids Landing Page specific styles */
+.landing-bg {
+    background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%);
+    min-height: 100vh; /* Fallback for older browsers */
+    min-height: 100dvh; /* Dynamic viewport height prevents mobile browser bar issues */
+    display: flex;
+    align-items: center;
+    padding: 1.5rem; /* Safe spacing on the edges for tiny screens */
+}
+
+.bubbly-card {
+    background: white;
+    border-radius: 2rem !important;
+    border: 4px solid white;
+    box-shadow: 0 10px 0 rgba(0,0,0,0.08) !important;
+    width: 100%; /* Allows shrinking on thin phones */
+}
+
+.bubbly-input {
+    background-color: #f7f9fa;
+    border: 2px solid #e5e5e5;
+    border-radius: 1.2rem;
+    padding: 1rem 1.2rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #4a4a4a;
+    transition: 0.2s;
+}
+
+.bubbly-input:focus {
+    border-color: #1cb0f6;
+    background-color: white;
+    box-shadow: none;
+    outline: none;
+}
+
+.bubbly-input::placeholder {
+    color: #afafaf;
+    font-weight: 600;
+}
+
+/* Make textareas resizable vertically, but upgrade the handle for mobile */
+textarea {
+    resize: vertical;
+}
+
+/* Create a massive, touch-friendly, dotted drag handle for mobile browsers! */
+textarea::-webkit-resizer {
+    background-color: #1cb0f6;
+    border-radius: 6px 0 6px 0;
+    width: 24px;  /* Massive width for thumbs */
+    height: 24px; /* Massive height for thumbs */
+    /* Fun "grip" dot texture instead of tiny lines */
+    background-image: radial-gradient(white 2px, transparent 2px);
+    background-size: 8px 8px;
+    background-position: center;
+}
+
+.btn-duo-primary {
+    background-color: #58cc02;
+    color: white;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-radius: 1.2rem;
+    border: none;
+    border-bottom: 5px solid #58a700;
+    padding: 1rem;
+    font-size: 1.2rem;
+    width: 100%;
+    margin-top: 1rem;
+    transition: all 0.1s ease;
+}
+
+.btn-duo-primary:hover {
+    background-color: #61e002;
+    color: white;
+}
+
+.btn-duo-primary:active {
+    border-bottom: 0px;
+    transform: translateY(5px);
+    margin-bottom: 5px;
+}
+
+/* Add a slight hover float effect to cards for interactiveness */
+.module-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 20px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Buttons - Make them pill-shaped and fun to click */
+.btn {
+    border-radius: 50rem; /* Pill shape */
+    font-weight: 600;
+    padding: 0.5rem 1.5rem;
+    transition: all 0.2s;
+}
+
+.btn:active {
+    transform: scale(0.95); /* Squish effect when clicked */
+}
+
+/* Specific styling for the Student Gamification UI */
+.student-bg {
+    background-color: #eef7ff; /* Very soft playful sky blue */
+    background-image: radial-gradient(#ffffff 3px, transparent 3px); /* Cute polka-dot/grid game pattern */
+    background-size: 30px 30px;
+    min-height: 100vh;
+}
+
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
+    border-radius: 1rem;
+}
+
+.badge-icon {
+    width: 60px;
+    height: 60px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Bouncy transition */
+}
+
+.badge-icon:hover {
+    transform: scale(1.15) rotate(5deg);
+}
+
+/* Progress bars chunky and fun */
+.progress {
+    border-radius: 1rem;
+    background-color: #e9ecef;
+}
+.progress-bar {
+    border-radius: 1rem;
+}
+
+/* Navigation Bars */
+.navbar {
+    border-bottom: 3px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Gamified Tab Navigation (For Teacher Dashboard Creation Tabs) */
+.gamified-tabs {
+    border-bottom: none !important;
+    gap: 0.5rem;
+    padding: 0.4rem;
+    background-color: #f0f4f8; /* Soft inset background */
+    border-radius: 1.2rem;
+    display: flex;
+    box-shadow: inset 0 3px 5px rgba(0,0,0,0.03); /* Gives it a "pressed in" well look */
+}
+
+.gamified-tabs .nav-item {
+    flex: 1; /* Makes tabs stretch equally */
+}
+
+.gamified-tabs .nav-link {
+    width: 100%;
+    text-align: center;
+    border: 2px solid transparent !important;
+    border-radius: 1rem !important;
+    color: #a0aab2 !important; /* Soft unselected text */
+    font-weight: 800 !important;
+    padding: 0.8rem 0.5rem;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    background-color: transparent !important;
+}
+
+.gamified-tabs .nav-link:hover {
+    background-color: rgba(0,0,0,0.04) !important;
+    color: #4a4a4a !important;
+    transform: scale(0.98);
+}
+
+/* Specific Active Colors for different tabs */
+.gamified-tabs .nav-link.active#reading-tab {
+    background-color: white !important;
+    color: #198754 !important; /* Bootstrap Success Green */
+    border: 2px solid #e1ecdf !important;
+    border-bottom: 4px solid #198754 !important;
+    box-shadow: 0 4px 10px rgba(25, 135, 84, 0.1);
+    transform: translateY(-2px);
+}
+
+.gamified-tabs .nav-link.active#quiz-tab {
+    background-color: white !important;
+    color: #0d6efd !important; /* Bootstrap Primary Blue */
+    border: 2px solid #dde7f6 !important;
+    border-bottom: 4px solid #0d6efd !important;
+    box-shadow: 0 4px 10px rgba(13, 110, 253, 0.1);
+    transform: translateY(-2px);
+}
+
+.gamified-tabs .nav-link.active#manage-tab {
+    background-color: white !important;
+    color: #6f42c1 !important;
+    border: 2px solid #e8ddfb !important;
+    border-bottom: 4px solid #6f42c1 !important;
+    box-shadow: 0 4px 10px rgba(111, 66, 193, 0.12);
+    transform: translateY(-2px);
+}
+
+/* Quiz Builder Question Cards Styling */
+.quiz-q-card {
+    border-radius: 1.2rem;
+    border: 2px solid #e5e5e5;
+    background-color: white;
+    overflow: hidden;
+    transition: 0.2s;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.04);
+}
+.quiz-q-card:hover {
+    border-color: #0d6efd;
+}
+.quiz-q-header {
+    background: #f8f9fa;
+    border-bottom: 2px solid #e5e5e5;
+    font-weight: 800;
+    color: #4a4a4a;
+}
+
+/* Responsive tuning for small phones and portrait tablets */
+@media (max-width: 767.98px) {
+    .container {
+        padding-left: 0.9rem;
+        padding-right: 0.9rem;
+    }
+
+    .gamified-tabs {
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+
+    .gamified-tabs .nav-item {
+        flex: 1 1 calc(50% - 0.4rem);
+        min-width: 120px;
+    }
+
+    .gamified-tabs .nav-link {
+        font-size: 0.9rem;
+        padding: 0.65rem 0.45rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .table {
+        font-size: 0.86rem;
+    }
+
+    .btn {
+        padding: 0.45rem 1rem;
+    }
+
+    .modal-dialog {
+        margin: 0.65rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .navbar .btn {
+        width: 100%;
+        margin-left: 0 !important;
+        margin-top: 0.5rem;
+    }
+
+    .table-responsive {
+        border-radius: 0.8rem;
+    }
+
+    #btn-load-my-modules {
+        white-space: nowrap;
+        font-size: 0.8rem;
+        padding-left: 0.8rem;
+        padding-right: 0.8rem;
+    }
+
+    #my-modules-list td,
+    #my-modules-list th {
+        white-space: nowrap;
+    }
+}

@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- HELPER FUNCTIONS ---
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // This fetches the user's document once and keeps it in memory for the request
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return signedIn() && getUserData().role == "admin";
+    }
+
+    function isTeacher() {
+      return signedIn() && getUserData().role == "teacher";
+    }
+
+    function isStudent() {
+      return signedIn() && getUserData().role == "student";
+    }
+
+    // --- COLLECTION RULES ---
+
+    match /users/{userId} {
+      allow read, create, update, delete: if isAdmin();
+
+      allow read: if signedIn() && (request.auth.uid == userId || (isTeacher() && resource.data.role == "student"));
+
+      allow update: if signedIn() 
+        && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(["xp", "completedModules", "scores"]);
+
+      allow update: if isTeacher()
+        && resource.data.role == "student"
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(["completedModules", "scores"]);
+    }
+
+    match /modules/{moduleId} {
+      allow read: if signedIn();
+      
+      allow create: if isAdmin() || (isTeacher() && request.resource.data.teacherId == request.auth.uid);
+      
+      allow update, delete: if isAdmin() || (isTeacher() && resource.data.teacherId == request.auth.uid);
+    }
+
+    match /system_logs/{logId} {
+      allow create: if isTeacher() || isAdmin();
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /leaderboard_public/{userId} {
+      allow read: if isAdmin() || isTeacher() || (
+        isStudent() && 
+        resource.data.gradeLevel == getUserData().gradeLevel && 
+        resource.data.section == getUserData().section
+      );
+
+      allow create, update: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(["displayName", "xp", "gradeLevel", "section", "updatedAt"])
+        && request.resource.data.gradeLevel == getUserData().gradeLevel
+        && request.resource.data.section == getUserData().section
+        && request.resource.data.displayName is string
+        && request.resource.data.xp is number;
+
+      allow delete: if isAdmin();
+    }
+  }
+}

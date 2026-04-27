@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | E-LMS</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <!-- Chart.js for Admin Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+</head>
+<body class="bg-light">
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="#"><i class="bi bi-shield-lock"></i> E-LMS System Admin</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <span class="nav-link text-white" id="user-greeting">Loading...</span>
+                    </li>
+                    <li class="nav-item">
+                        <button id="logout-btn" class="btn btn-outline-light btn-sm ms-3 mt-1">Log Out</button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Grid -->
+    <div class="container mt-4 mb-5">
+        
+        <!-- Platform Health Overview (KPIs) -->
+        <div class="row g-3 mb-4 text-center">
+            <div class="col-md-3 col-sm-6">
+                <div class="card shadow-sm border-0 bg-primary text-white h-100">
+                    <div class="card-body">
+                        <h6 class="mb-1 text-uppercase opacity-75">Total Users</h6>
+                        <h2 class="mb-0 fw-bold" id="kpi-users">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="card shadow-sm border-0 bg-success text-white h-100">
+                    <div class="card-body">
+                        <h6 class="mb-1 text-uppercase opacity-75">Active Students</h6>
+                        <h2 class="mb-0 fw-bold" id="kpi-students">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="card shadow-sm border-0 bg-info text-dark h-100">
+                    <div class="card-body">
+                        <h6 class="mb-1 text-uppercase opacity-75">Active Teachers</h6>
+                        <h2 class="mb-0 fw-bold" id="kpi-teachers">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="card shadow-sm border-0 bg-warning text-dark h-100">
+                    <div class="card-body">
+                        <h6 class="mb-1 text-uppercase opacity-75">Learning Modules</h6>
+                        <h2 class="mb-0 fw-bold" id="kpi-modules">0</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NEW: Analytics & Reports Section -->
+        <div class="row g-4 mb-4">
+            <div class="col-lg-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-bottom pb-2 pt-3 d-flex justify-content-between align-items-center">
+                        <h5 class="card-title text-dark mb-0"><i class="bi bi-bar-chart-fill text-primary"></i> Demographics Overview</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="barChart" style="max-height: 250px;"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-bottom pb-2 pt-3 d-flex justify-content-between align-items-center">
+                        <h5 class="card-title text-dark mb-0"><i class="bi bi-pie-chart-fill text-success"></i> Module Completion Stats</h5>
+                    </div>
+                    <div class="card-body d-flex justify-content-center">
+                        <canvas id="pieChart" style="max-height: 250px;"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <!-- Left Column: User Management -->
+            <div class="col-lg-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-bottom pb-2 pt-3 d-flex justify-content-between align-items-center">
+                        <h5 class="card-title text-dark mb-0"><i class="bi bi-people-fill text-primary"></i> System Users</h5>
+                        <div class="d-flex">
+                            <select class="form-select form-select-sm me-2" id="filter-user-role" style="max-width: 130px; cursor: pointer;">
+                                <option value="all">All Roles</option>
+                                <option value="student">Students</option>
+                                <option value="teacher">Teachers</option>
+                                <option value="admin">Admins</option>
+                            </select>
+                            <button class="btn btn-sm btn-outline-secondary me-2" id="btn-export-csv" title="Extract All User Data">
+                                <i class="bi bi-download"></i> CSV
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary me-2" id="btn-refresh-admin" title="Refresh System Data">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh
+                            </button>
+                            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createUserModal">
+                                <i class="bi bi-person-plus"></i> Create User
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-hover mb-0 align-middle">
+                                <thead class="table-light text-muted sticky-top">
+                                    <tr>
+                                        <th scope="col" class="ps-4">Name/Email</th>
+                                        <th scope="col">Role</th>
+                                        <th scope="col">Stats</th>
+                                        <th scope="col" class="text-end pe-4">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-list">
+                                    <tr>
+                                        <td colspan="4" class="text-center py-4 text-muted">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status"></div> Loading users...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Content Moderation -->
+            <div class="col-lg-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-bottom pb-2 pt-3 d-flex justify-content-between align-items-center">
+                        <h5 class="card-title text-dark mb-0"><i class="bi bi-journal-check text-success"></i> Content Moderation</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-hover mb-0 align-middle">
+                                <thead class="table-light text-muted sticky-top">
+                                    <tr>
+                                        <th scope="col" class="ps-4">Module Title</th>
+                                        <th scope="col">Author</th>
+                                        <th scope="col">XP Reward</th>
+                                        <th scope="col" class="text-end pe-4">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="modules-list">
+                                    <tr>
+                                        <td colspan="4" class="text-center py-4 text-muted">
+                                            <div class="spinner-border spinner-border-sm text-success" role="status"></div> Loading modules...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- NEW: System Audit Logs -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white border-bottom pb-2 pt-3 d-flex justify-content-between align-items-center">
+                        <h5 class="card-title text-dark mb-0"><i class="bi bi-clock-history text-warning"></i> System Audit Logs</h5>
+                        <button class="btn btn-sm btn-outline-secondary" id="btn-export-logs" title="Extract Log Data">
+                            <i class="bi bi-download"></i> Download Logs
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead class="table-light text-muted sticky-top">
+                                    <tr>
+                                        <th scope="col" class="ps-4">Timestamp</th>
+                                        <th scope="col">Action Type</th>
+                                        <th scope="col">User/Actor</th>
+                                        <th scope="col">Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="audit-logs-list">
+                                    <tr>
+                                        <td colspan="4" class="text-center py-4 text-muted">
+                                            <div class="spinner-border spinner-border-sm text-warning" role="status"></div> Tracking system activity...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Create User Modal (Admin Tool) -->
+    <div class="modal fade" id="createUserModal" tabindex="-1" aria-labelledby="createUserModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0 shadow-lg">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title fw-bold text-dark" id="createUserModalLabel"><i class="bi bi-person-plus-fill text-primary"></i> Create New User</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body pt-3 pb-4">
+                    <form id="create-user-form">
+                        <div class="mb-3">
+                            <label for="new-user-name" class="form-label text-muted">Full Name</label>
+                            <input type="text" class="form-control" id="new-user-name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="new-user-email" class="form-label text-muted">Email Address</label>
+                            <input type="email" class="form-control" id="new-user-email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="new-user-pwd" class="form-label text-muted">Temporary Password</label>
+                            <input type="password" class="form-control" id="new-user-pwd" required minlength="6" value="password123">
+                            <small class="text-muted">Defaults to 'password123'</small>
+                        </div>
+                        <div class="mb-3">
+                            <label for="new-user-role" class="form-label text-muted">System Role</label>
+                            <select class="form-select border-primary" id="new-user-role" required>
+                                <option value="student" selected>Student</option>
+                                <option value="teacher">Teacher</option>
+                                <option value="admin">Administrator</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Toggle extra fields if Student -->
+                        <div id="student-only-fields" class="row border-top pt-3 mt-3">
+                            <h6 class="text-primary fs-6 mb-3">Student Placement details</h6>
+                            <div class="col-6 mb-3">
+                                <label for="new-user-grade" class="form-label text-muted">Grade Level</label>
+                                <select class="form-select" id="new-user-grade">
+                                    <option value="Grade 1">Grade 1</option>
+                                    <option value="Grade 2">Grade 2</option>
+                                    <option value="Grade 3">Grade 3</option>
+                                    <option value="Grade 4">Grade 4</option>
+                                    <option value="Grade 5">Grade 5</option>
+                                    <option value="Grade 6">Grade 6</option>
+                                </select>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label for="new-user-section" class="form-label text-muted">Section</label>
+                                <select class="form-select" id="new-user-section">
+                                    <option value="Section A">Section A</option>
+                                    <option value="Section B">Section B</option>
+                                    <option value="Section C">Section C</option>
+                                    <option value="Section D">Section D</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="create-user-error" class="text-danger small mb-3 d-none"></div>
+                        <div id="create-user-success" class="text-success small mb-3 d-none">User successfully created!</div>
+
+                        <button type="submit" class="btn btn-primary w-100 rounded-pill shadow-sm" id="submit-new-user-btn">
+                            Create User Account
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0 shadow-lg">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title fw-bold text-dark" id="editUserModalLabel">✏️ Edit Student Info</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body pt-3 pb-4">
+                    <form id="edit-user-form">
+                        <input type="hidden" id="edit-user-id">
+                        <div class="mb-3">
+                            <label for="edit-user-grade" class="form-label text-muted">Grade Level</label>
+                            <select class="form-select" id="edit-user-grade">
+                                <option value="Grade 1">Grade 1</option>
+                                <option value="Grade 2">Grade 2</option>
+                                <option value="Grade 3">Grade 3</option>
+                                <option value="Grade 4">Grade 4</option>
+                                <option value="Grade 5">Grade 5</option>
+                                <option value="Grade 6">Grade 6</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-user-section" class="form-label text-muted">Section</label>
+                            <select class="form-select" id="edit-user-section">
+                                <option value="Section A">Section A</option>
+                                <option value="Section B">Section B</option>
+                                <option value="Section C">Section C</option>
+                                <option value="Section D">Section D</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 rounded-pill shadow-sm" id="save-user-btn">
+                            Save Changes
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- App Scripts -->
+    <script type="module" src="js/firebase-config.js"></script>
+    <script type="module" src="js/admin.js"></script>
+</body>
+</html>

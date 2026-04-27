@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Dashboard | E-LMS</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <!-- Chart.js for Teacher Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+</head>
+<body class="bg-light">
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-success shadow-sm">
+        <div class="container">
+            <a class="navbar-brand" href="#">E-LMS Teacher Portal</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <span class="nav-link text-white" id="user-greeting">Loading...</span>
+                    </li>
+                    <li class="nav-item">
+                        <button id="logout-btn" class="btn btn-outline-light btn-sm ms-3 mt-1">Log Out</button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container mt-4 mb-5">
+
+        <!-- Big Gemini-style Welcome Greeting -->
+        <div class="row mb-4 mt-2">
+            <div class="col-12 ps-lg-4">
+                <h3 class="fw-bold mb-0" style="color: #a0aab2; font-size: clamp(1.2rem, 3vw, 1.5rem);">Hi <span id="main-greeting-name">Teacher</span>,</h3>
+                <h1 class="fw-bold" style="color: #2c3e50; font-size: clamp(1.8rem, 5vw, 2.8rem);">Ready to inspire? ✨</h1>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            
+            <!-- Left Column: Module Creation -->
+            <div class="col-lg-5">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-bottom pb-0 pt-3">
+                        <ul class="nav nav-tabs gamified-tabs mb-2" id="createTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="reading-tab" data-bs-toggle="tab" data-bs-target="#reading" type="button" role="tab"><i class="bi bi-book"></i> Reading</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="quiz-tab" data-bs-toggle="tab" data-bs-target="#quiz" type="button" role="tab"><i class="bi bi-patch-question"></i> Quiz</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="manage-tab" data-bs-toggle="tab" data-bs-target="#manage" type="button" role="tab"><i class="bi bi-list-task"></i> Manage</button>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card-body pt-2">
+                        <div class="tab-content" id="createTabsContent">
+                            <!-- TAB 1: READING MODULE (NO QUIZ) -->
+                            <div class="tab-pane fade show active" id="reading" role="tabpanel">
+                                <form id="create-module-form">
+                                    <div class="mb-3">
+                                        <label for="module-title" class="form-label text-muted">Reading Title</label>
+                                        <input type="text" class="form-control" id="module-title" required placeholder="e.g., Intro to Biology">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="module-desc" class="form-label text-muted">Description / Objectives</label>
+                                        <textarea class="form-control" id="module-desc" rows="3" style="min-height: 80px;" required placeholder="Describe the learning outcomes..."></textarea>
+                                    </div>
+                            <div class="mb-3">
+                                <label for="module-content" class="form-label text-primary fw-bold">📚 Lesson Content (The Reading Material)</label>
+                                <textarea class="form-control border-primary bg-light" id="module-content" rows="8" style="min-height: 200px;" required placeholder="Write the actual lesson here. Separate sentences with periods. The student will read this piece by piece!"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="module-image" class="form-label text-muted">Optional Lesson Image (scan/photo)</label>
+                                <input type="file" class="form-control" id="module-image" accept="image/*">
+                                <small class="text-muted">Recommended: JPG/PNG under 2MB for faster loading on mobile data.</small>
+                            </div>
+                            <div class="mb-3">
+                                <label for="module-pdf-url" class="form-label text-muted">Optional PDF Link URL</label>
+                                <input type="url" class="form-control" id="module-pdf-url" placeholder="https://example.com/lesson.pdf">
+                                <small class="text-muted">Paste a public PDF link so students can open it in browser or mobile PDF app.</small>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="module-grade" class="form-label text-muted">Target Grade Level</label>
+                                    <select class="form-select" id="module-grade" required>
+                                        <option value="" disabled selected>Select Grade</option>
+                                        <option value="Grade 1">Grade 1</option>
+                                        <option value="Grade 2">Grade 2</option>
+                                        <option value="Grade 3">Grade 3</option>
+                                        <option value="Grade 4">Grade 4</option>
+                                        <option value="Grade 5">Grade 5</option>
+                                        <option value="Grade 6">Grade 6</option>
+                                        <option value="All Grades">All Grades</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="module-section" class="form-label text-muted">Target Section</label>
+                                    <select class="form-select" id="module-section" required>
+                                        <option value="All">All Sections</option>
+                                        <option value="Section A">Section A</option>
+                                        <option value="Section B">Section B</option>
+                                        <option value="Section C">Section C</option>
+                                        <option value="Section D">Section D</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="module-subject" class="form-label text-muted">Subject</label>
+                                    <select class="form-select" id="module-subject" required>
+                                        <option value="" disabled selected>Select Subject</option>
+                                        <option value="Math">Math</option>
+                                        <option value="GMRC">GMRC</option>
+                                        <option value="Language">Language</option>
+                                        <option value="Reading and Literacy">Reading and Literacy</option>
+                                        <option value="Makabansa">Makabansa</option>
+                                        <option value="All Subjects">All Subjects</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="module-grading-type" class="form-label fw-bold text-primary">Grading Category</label>
+                                    <select class="form-select border-primary bg-light" id="module-grading-type">
+                                        <option value="none">Practice Only (XP Only)</option>
+                                    </select>
+                                    <small class="text-muted">Reading is not graded.</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="module-xp" class="form-label text-muted">XP Reward</label>
+                                    <input type="number" class="form-control" id="module-xp" required min="10" max="500" value="50">
+                                    <small class="text-muted">Earned for reading.</small>
+                                </div>
+                            </div>
+                            <div id="module-alert" class="alert alert-success d-none mb-3" role="alert">
+                                Reading material published!
+                            </div>
+                            <button type="submit" class="btn btn-success w-100">Publish Material</button>
+                        </form>
+                    </div>
+
+                    <!-- TAB 2: STANDALONE QUIZ CREATOR -->
+                    <div class="tab-pane fade" id="quiz" role="tabpanel">
+                        <form id="create-quiz-form">
+                            <div class="mb-3">
+                                <label for="quiz-title" class="form-label text-muted">Quiz Title</label>
+                                <input type="text" class="form-control border-primary" id="quiz-title" required placeholder="e.g., Biology Pop Quiz">
+                            </div>
+                            <div class="mb-3">
+                                <label for="quiz-desc" class="form-label text-muted">Instructions</label>
+                                <textarea class="form-control" id="quiz-desc" rows="2" style="min-height: 60px;" required placeholder="Quiz instructions..."></textarea>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    <label for="quiz-grade" class="form-label text-muted">Grade</label>
+                                    <select class="form-select" id="quiz-grade" required>
+                                        <option value="Grade 1">Grade 1</option>
+                                        <option value="Grade 2">Grade 2</option>
+                                        <option value="Grade 3">Grade 3</option>
+                                        <option value="Grade 4">Grade 4</option>
+                                        <option value="Grade 5">Grade 5</option>
+                                        <option value="Grade 6">Grade 6</option>
+                                        <option value="All Grades" selected>All Grades</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="quiz-section" class="form-label text-muted">Section</label>
+                                    <select class="form-select" id="quiz-section" required>
+                                        <option value="All" selected>All Sections</option>
+                                        <option value="Section A">Section A</option>
+                                        <option value="Section B">Section B</option>
+                                        <option value="Section C">Section C</option>
+                                        <option value="Section D">Section D</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="quiz-subject" class="form-label text-muted">Subject</label>
+                                    <select class="form-select" id="quiz-subject" required>
+                                        <option value="Math" selected>Math</option>
+                                        <option value="GMRC">GMRC</option>
+                                        <option value="Language">Language</option>
+                                        <option value="Reading and Literacy">Reading and Literacy</option>
+                                        <option value="Makabansa">Makabansa</option>
+                                        <option value="All Subjects">All Subjects</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="quiz-xp" class="form-label text-muted">XP</label>
+                                    <input type="number" class="form-control" id="quiz-xp" required min="10" value="100">
+                                </div>
+                            </div>
+                            <div class="row border rounded py-2 px-1 bg-light mx-0 mb-3 align-items-center">
+                                <div class="col-md-6 mb-2 mb-md-0">
+                                    <label for="quiz-grading-type" class="form-label fw-bold text-primary mb-1">Grading Category</label>
+                                    <select class="form-select border-primary" id="quiz-grading-type">
+                                        <option value="ww">Written Work (WW)</option>
+                                        <option value="pt">Performance Task (PT)</option>
+                                        <option value="qa">Quarterly Assessment (QA)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="quiz-max-score" class="form-label fw-bold text-primary mb-1">Expected Grade / Max Score</label>
+                                    <input type="number" class="form-control border-primary fw-bold" id="quiz-max-score" required min="1" value="100">
+                                </div>
+                            </div>
+                            
+                            <!-- Quiz Builder -->
+                            <div class="mb-3 border rounded p-3 bg-white shadow-sm">
+                                <label class="form-label text-dark fw-bold mb-2"><i class="bi bi-patch-question"></i> Quiz Questions</label>
+                                <div id="quiz-builder-container" class="mb-2"></div>
+                                <button type="button" class="btn btn-sm btn-outline-primary w-100 fw-bold" id="btn-add-question">+ Add Multiple Choice Question</button>
+                            </div>
+                            <div id="quiz-alert" class="alert alert-success d-none mb-3" role="alert">Quiz Published!</div>
+                            <button type="submit" class="btn btn-primary w-100">Publish Quiz</button>
+                        </form>
+                    </div>
+
+                    <!-- TAB 3: MANAGE MODULES -->
+                    <div class="tab-pane fade" id="manage" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="text-secondary mb-0"><i class="bi bi-collection"></i> My Modules</h6>
+                            <button id="btn-load-my-modules" class="btn btn-sm btn-outline-primary fw-bold">Load Modules</button>
+                        </div>
+                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-sm table-hover align-middle">
+                                <thead class="table-light sticky-top">
+                                    <tr>
+                                        <th>Title</th>
+                                        <th>Type</th>
+                                        <th>Target</th>
+                                        <th class="text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="my-modules-list">
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-4">Click "Load Modules" to view and manage your content.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Real-time Student Monitoring -->
+            <div class="col-lg-7">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-bottom pb-2 pt-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="card-title text-primary mb-0"><i class="bi bi-people"></i> Student Analytics</h5>
+                            <div>
+                                <button class="btn btn-sm btn-outline-info me-2 fw-bold text-dark" data-bs-toggle="modal" data-bs-target="#gradingReferenceModal">
+                                    <i class="bi bi-info-circle-fill text-info"></i> Grading Reference
+                                </button>
+                                <span class="badge bg-primary rounded-pill" id="student-count">0</span>
+                            </div>
+                        </div>
+                        <!-- Filters for controlling Firebase Read Costs -->
+                        <div class="row g-2 align-items-center py-2">
+                            <div class="col-md-5">
+                                <select class="form-select form-select-sm border-primary" id="filter-grade">
+                                    <option value="">All Grades</option>
+                                    <option value="Grade 1">Grade 1</option>
+                                    <option value="Grade 2">Grade 2</option>
+                                    <option value="Grade 3">Grade 3</option>
+                                    <option value="Grade 4">Grade 4</option>
+                                    <option value="Grade 5">Grade 5</option>
+                                    <option value="Grade 6">Grade 6</option>
+                                </select>
+                            </div>
+                            <div class="col-md-5">
+                                <select class="form-select form-select-sm border-primary" id="filter-section">
+                                    <option value="">All Sections</option>
+                                    <option value="Section A">Section A</option>
+                                    <option value="Section B">Section B</option>
+                                    <option value="Section C">Section C</option>
+                                    <option value="Section D">Section D</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-sm btn-primary w-100 fw-bold" id="btn-load-students" title="Load/Refresh Data">
+                                    <i class="bi bi-arrow-clockwise"></i> Load
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0 border-bottom">
+                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light text-muted sticky-top">
+                                    <tr>
+                                        <th scope="col" class="ps-4">Student Name</th>
+                                        <th scope="col">Grade & Sec</th>
+                                        <th scope="col">Total XP</th>
+                                        <th scope="col">Overall Grade</th>
+                                        <th scope="col">Status</th>
+                                        <th scope="col" class="text-end pe-4">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="student-monitoring-list">
+                                    <!-- Students will be injected here via JS (onSnapshot) -->
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4 text-muted">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status"></div> Loading classroom data...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- Teacher Class Completion Chart with Local Filters -->
+                    <div class="card-footer bg-white p-0 border-top-0 shadow-sm mt-2 rounded">
+                        <div class="bg-light text-dark border-bottom p-2 px-3 d-flex flex-wrap justify-content-between align-items-center" style="border-top-left-radius: 0; border-top-right-radius: 0;">
+                            <h6 class="fw-bold mb-0 me-2"><i class="bi bi-pie-chart-fill text-success"></i> Module Completion Stats</h6>
+                            <!-- New inline local filters -->
+                            <div class="d-flex gap-2 mt-2 mt-sm-0">
+                                <input type="text" id="localFilterName" class="form-control form-control-sm border-0 shadow-sm text-dark" placeholder="Name..." style="width: 100px;">
+                                <select id="localFilterGrade" class="form-select form-select-sm border-0 shadow-sm text-dark" style="width: auto;">
+                                    <option value="">All Grades</option>
+                                    <option value="Grade 1">Grade 1</option>
+                                    <option value="Grade 2">Grade 2</option>
+                                    <option value="Grade 3">Grade 3</option>
+                                    <option value="Grade 4">Grade 4</option>
+                                    <option value="Grade 5">Grade 5</option>
+                                    <option value="Grade 6">Grade 6</option>
+                                </select>
+                                <select id="localFilterSection" class="form-select form-select-sm border-0 shadow-sm text-dark" style="width: auto;">
+                                    <option value="">All Sections</option>
+                                    <option value="Section A">Section A</option>
+                                    <option value="Section B">Section B</option>
+                                    <option value="Section C">Section C</option>
+                                    <option value="Section D">Section D</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-center align-items-center pt-4 pb-4">
+                            <div style="height: 200px; width: 100%; max-width: 350px; position: relative;">
+                                <canvas id="teacherClassChart"></canvas>
+                            </div>
+                            <div class="ms-4 text-center">
+                                <h3 class="mb-0 fw-bold text-success display-6" id="chart-stat-active">0%</h3>
+                                <small class="text-muted fw-bold text-uppercase">Participation Rate</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Deeper Analytics Modal -->
+    <div class="modal fade" id="studentDetailsModal" tabindex="-1" aria-labelledby="studentDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-primary text-white border-0">
+                    <h5 class="modal-title fw-bold" id="studentDetailsModalLabel"><i class="bi bi-person-badge"></i> Student Profile</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h3 id="sd-modal-name" class="fw-bold mb-0 text-dark">Student Name</h3>
+                            <p id="sd-modal-info" class="text-muted mb-0">Grade - Section</p>
+                        </div>
+                        <div class="col-md-6 text-md-end mt-3 mt-md-0">
+                            <div class="d-inline-block text-center me-3">
+                                <h3 id="sd-modal-xp" class="text-warning fw-bold mb-0">0</h3>
+                                <small class="text-muted text-uppercase">Total XP</small>
+                            </div>
+                            <div class="d-inline-block text-center">
+                                <h3 id="sd-modal-grade" class="text-success fw-bold mb-0">0%</h3>
+                                <small class="text-muted text-uppercase">Overall Grade</small>
+                            </div>
+                        </div>
+                    </div>
+                    <h6 class="fw-bold text-secondary text-uppercase mb-3"><i class="bi bi-journal-check"></i> Completed Activities</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Activity Name</th>
+                                    <th>Type</th>
+                                    <th class="text-center">Score</th>
+                                    <th class="text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sd-modal-completed-list">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-0">
+                    <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual Grade Input Modal (Overrides Score) -->
+    <div class="modal fade" id="manualGradeModal" tabindex="-1" style="z-index: 1060;" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content shadow rounded-4 border-0">
+                <div class="modal-header bg-warning border-0">
+                    <h6 class="modal-title fw-bold text-dark"><i class="bi bi-pencil-square"></i> Set/Override Grade</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="manual-grade-form">
+                        <input type="hidden" id="grade-student-id">
+                        <input type="hidden" id="grade-module-id">
+                        <input type="hidden" id="grade-module-type">
+                        <input type="hidden" id="grade-max-score">
+                        
+                        <p class="small text-muted mb-2">Update the score for: <strong id="grade-module-name" class="text-dark">Activity</strong></p>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">New Score</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control fw-bold text-center" id="grade-new-score" required min="0">
+                                <span class="input-group-text bg-light text-muted fw-bold" id="grade-max-label">/ 10</span>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-warning w-100 fw-bold shadow-sm" id="btn-save-grade">Save Grade</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grading Reference Table Modal -->
+    <div class="modal fade" id="gradingReferenceModal" tabindex="-1" aria-labelledby="gradingReferenceModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header bg-info text-dark border-0">
+                    <h5 class="modal-title fw-bold" id="gradingReferenceModalLabel"><i class="bi bi-info-circle-fill"></i> DepEd Grading Framework (Reference)</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <h6 class="fw-bold text-secondary text-uppercase mb-3"><i class="bi bi-percent"></i> Subject Weight Distribution</h6>
+                    <div class="table-responsive mb-4">
+                        <table class="table table-bordered table-sm align-middle text-center">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="text-start">Subject Area (Tracks)</th>
+                                    <th>Written Work (WW)</th>
+                                    <th>Perf. Task (PT)</th>
+                                    <th>Quarterly Assess. (QA)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="text-start fw-medium">Language, AP, EsP, GMRC</td>
+                                    <td>30%</td>
+                                    <td class="fw-bold text-primary">50%</td>
+                                    <td>20%</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-start fw-medium">Math, Science</td>
+                                    <td class="fw-bold text-success">40%</td>
+                                    <td class="fw-bold text-success">40%</td>
+                                    <td>20%</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-start fw-medium">MAPEH, EPP / TLE</td>
+                                    <td>20%</td>
+                                    <td class="fw-bold text-warning text-dark">60%</td>
+                                    <td>20%</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h6 class="fw-bold text-secondary text-uppercase mb-3"><i class="bi bi-award"></i> Descriptive Equivalent (Transmuted)</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Grading Scale</th>
+                                    <th>Descriptor</th>
+                                    <th class="text-center">Status Badge</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="fw-bold text-success">90 - 100</td>
+                                    <td>Outstanding (Advancing)</td>
+                                    <td class="text-center"><span class="badge bg-success">Success</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold text-primary">85 - 89</td>
+                                    <td>Very Satisfactory</td>
+                                    <td class="text-center"><span class="badge bg-primary">Good</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold text-info text-dark">80 - 84</td>
+                                    <td>Satisfactory</td>
+                                    <td class="text-center"><span class="badge bg-info text-dark">Passing</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold text-warning text-dark">75 - 79</td>
+                                    <td>Fairly Satisfactory</td>
+                                    <td class="text-center"><span class="badge bg-warning text-dark">Borderline</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold text-danger">Below 75</td>
+                                    <td>Did Not Meet Expectations</td>
+                                    <td class="text-center"><span class="badge bg-danger">Failing</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-0">
+                    <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">Got it</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Module Preview Modal -->
+    <div class="modal fade" id="viewModuleModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-bottom-0 bg-light">
+                    <h5 class="modal-title fw-bold text-primary" id="viewModuleTitle">Module Title</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <span class="badge bg-secondary text-uppercase" id="viewModuleType">Type</span>
+                        <span class="badge bg-info text-dark" id="viewModuleTarget">Grade</span>
+                        <span class="badge bg-warning text-dark" id="viewModuleSubject">Subject</span>
+                        <span class="badge bg-success" id="viewModuleGrading">Grading</span>
+                    </div>
+                    <p class="text-muted fw-bold mb-1">Description / Objectives:</p>
+                    <p id="viewModuleDesc" class="bg-light p-3 rounded text-dark lh-base"></p>
+                    
+                    <div id="viewModuleContentArea" class="mt-4">
+                        <!-- Reading content or Quiz questions injected here -->
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill w-100" data-bs-dismiss="modal">Close Preview</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- App Scripts -->
+    <script src="js/app.js"></script>
+    <script type="module" src="js/firebase-config.js"></script>
+    <script type="module" src="js/teacher.js"></script>
+</body>
+</html>
