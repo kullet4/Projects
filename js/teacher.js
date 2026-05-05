@@ -1,6 +1,6 @@
 import { auth, db } from './firebase-config.js';
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
-import { doc, getDoc, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+import { doc, getDoc, setDoc, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-storage.js";
 
 // DOM Elements
@@ -206,12 +206,16 @@ if(createQuizForm) {
 
         // Gather Questions
         const questions = [];
+        const answerKey = [];
         document.querySelectorAll('#quiz-builder-container .quiz-q-card').forEach(card => {
+            const question = card.querySelector('.q-text').value;
+            const options = Array.from(card.querySelectorAll('.q-opt')).map(i => i.value);
+            const correctIndex = parseInt(card.querySelector('.q-ans').value, 10);
             questions.push({
-                question: card.querySelector('.q-text').value,
-                options: Array.from(card.querySelectorAll('.q-opt')).map(i => i.value),
-                correctIndex: parseInt(card.querySelector('.q-ans').value, 10)
+                question,
+                options
             });
+            answerKey.push(correctIndex);
         });
 
         if (questions.length === 0) {
@@ -223,7 +227,7 @@ if(createQuizForm) {
             submitBtn.disabled = true;
             submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Publishing...`;
 
-            await addDoc(collection(db, "modules"), {
+            const moduleRef = await addDoc(collection(db, "modules"), {
                 type: 'quiz',
                 title: title,
                 description: desc,
@@ -231,13 +235,21 @@ if(createQuizForm) {
                 targetSection: section,
                 subject: subject,
                 gradingCategory: gradingType,  // 'ww', 'pt', 'qa', 'none'
-                questions: questions,          // Array of M/C questions
+                questions: questions,          // Student-facing questions without answer key
                 maxScore: expectedMaxScore || questions.length,    // Updated to use the custom expected grade set by teacher
                 xpReward: xp,
                 teacherId: auth.currentUser.uid,
                 teacherName: currentUserDoc.name || 'Instructor',
                 createdAt: serverTimestamp(),
                 status: 'active'
+            });
+
+            // Keep answer keys outside student-readable module docs.
+            await setDoc(doc(db, "quiz_keys", moduleRef.id), {
+                moduleId: moduleRef.id,
+                answers: answerKey,
+                createdAt: serverTimestamp(),
+                teacherId: auth.currentUser.uid
             });
 
             quizAlert.classList.remove('d-none');
@@ -371,27 +383,38 @@ async function loadStudentData() {
                 } else {
                     // Loop backwards so newest activities are on top
                     completedMods.slice().reverse().forEach(mod => {
-                        const modType = mod.gradingCategory && mod.gradingCategory !== 'none' 
-                            ? mod.gradingCategory.toUpperCase() 
+                        const modData = (mod && typeof mod === 'object')
+                            ? mod
+                            : {
+                                moduleId: typeof mod === 'string' ? mod : '',
+                                title: typeof mod === 'string' ? `Legacy Activity (${mod})` : 'Legacy Activity',
+                                gradingCategory: 'none',
+                                score: 0,
+                                maxScore: 0,
+                                isLegacy: true
+                            };
+
+                        const modType = modData.gradingCategory && modData.gradingCategory !== 'none' 
+                            ? modData.gradingCategory.toUpperCase() 
                             : 'PRACTICE';
                         
                         let badgeColor = modType === 'PRACTICE' ? 'bg-secondary' : 'bg-primary';
                             
-                        const scoreTxt = (mod.maxScore && mod.maxScore > 0) 
-                            ? `${mod.score || 0}/${mod.maxScore}` 
+                        const scoreTxt = (modData.maxScore && modData.maxScore > 0) 
+                            ? `${modData.score || 0}/${modData.maxScore}` 
                             : `<i class="bi bi-check-circle-fill text-success"></i>`;
                             
-                        const actionBtn = (mod.maxScore && mod.maxScore > 0) 
+                        const actionBtn = (!modData.isLegacy && modData.maxScore && modData.maxScore > 0) 
                             ? `<button class="btn btn-sm btn-outline-warning text-dark px-2 py-0 fw-bold border-2 shadow-sm"
                                        title="Override Score"
-                                       onclick="window.openGradeEditor('${docSnap.id}', '${mod.moduleId}', '${mod.title || 'Unknown Activity'}', ${mod.score || 0}, ${mod.maxScore})">
+                                       onclick="window.openGradeEditor('${docSnap.id}', '${modData.moduleId}', '${modData.title || 'Unknown Activity'}', ${modData.score || 0}, ${modData.maxScore})">
                                    <i class="bi bi-pencil-square"></i> Edit
                                </button>`
                             : `<span class="text-muted small">N/A</span>`;
 
                         listEl.innerHTML += `
                             <tr>
-                                <td class="fw-medium text-dark">${mod.title || 'Unknown Activity'}</td>
+                                <td class="fw-medium text-dark">${modData.title || 'Unknown Activity'}</td>
                                 <td><span class="badge ${badgeColor}">${modType}</span></td>
                                 <td class="text-center fw-bold text-success">${scoreTxt}</td>
                                 <td class="text-end">${actionBtn}</td>
@@ -566,7 +589,7 @@ if (manualGradeForm) {
                 const completedMods = data.completedModules || [];
                 const scores = data.scores || { wwRaw: 0, wwMax: 100, ptRaw: 0, ptMax: 100, qaRaw: 0, qaMax: 100 };
                 
-                let foundMod = completedMods.find(m => m.moduleId === mId);
+                let foundMod = completedMods.find(m => m && typeof m === 'object' && m.moduleId === mId);
                 
                 if (foundMod) {
                     const oldScore = foundMod.score || 0;
@@ -706,14 +729,12 @@ if (btnLoadMyModules) {
                                 qHtml += `<div class="list-group-item bg-white border mb-2 rounded shadow-sm">
                                             <h6 class="fw-bold mb-2">Q${i+1}. ${q.question}</h6>
                                             <div class="ms-3 d-flex flex-column gap-1">`;
-                                q.options.forEach((opt, oIdx) => {
-                                    const isCorrect = oIdx === q.correctIndex;
-                                    qHtml += `<div class="p-2 border rounded ${isCorrect ? 'bg-success text-white fw-bold' : 'bg-light'}">
-                                                ${isCorrect ? '<i class="bi bi-check-circle-fill"></i> ' : ''}${opt}
-                                              </div>`;
+                                q.options.forEach((opt) => {
+                                    qHtml += `<div class="p-2 border rounded bg-light">${opt}</div>`;
                                 });
                                 qHtml += `</div></div>`;
                             });
+                            qHtml += `<p class="text-muted mt-2 mb-0"><small>Answer key is stored securely and not exposed to students.</small></p>`;
                         } else {
                             qHtml += `<p class="text-muted">No questions found.</p>`;
                         }
@@ -737,6 +758,7 @@ if (btnLoadMyModules) {
                         e.currentTarget.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`;
                         try {
                             await deleteDoc(doc(db, "modules", modId));
+                            await deleteDoc(doc(db, "quiz_keys", modId)).catch(() => {});
                             await logTeacherAction("MODULE_DELETED", `Teacher deleted module: ${modTitle} (${modId})`);
                             const rowToRemove = e.currentTarget.closest('tr');
                             rowToRemove.style.opacity = '0.5';

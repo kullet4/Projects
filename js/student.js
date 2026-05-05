@@ -1,19 +1,16 @@
 import { auth, db } from './firebase-config.js';
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
-import { doc, getDoc, setDoc, collection, query, where, orderBy, limit, getDocs, updateDoc, increment, arrayUnion, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+import { doc, getDoc, collection, query, orderBy, getDocs, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 
 // DOM Elements
 const userGreeting = document.getElementById('user-greeting');
 const logoutBtn = document.getElementById('logout-btn');
 const xpPoints = document.getElementById('xp-points');
-const leaderboardList = document.getElementById('leaderboard-list');
 const learningModules = document.getElementById('learning-modules');
 
 let currentXP = 0;
 let userDocRef = null;
 let completedModulesList = [];
-let currentStudentGrade = '';
-let currentStudentSection = '';
 
 // Gamification Modal Variables
 let currentLessonChunks = [];
@@ -26,6 +23,32 @@ let currentLessonCard = null;
 let currentModId = null;
 let isReviewMode = false;
 
+function getCompletedModuleId(entry) {
+    if (typeof entry === 'string') return entry;
+    if (entry && typeof entry === 'object' && typeof entry.moduleId === 'string') return entry.moduleId;
+    return null;
+}
+
+function buildCompletedModuleIdSet(entries) {
+    const ids = new Set();
+    if (!Array.isArray(entries)) return ids;
+    entries.forEach((entry) => {
+        const modId = getCompletedModuleId(entry);
+        if (modId) ids.add(modId);
+    });
+    return ids;
+}
+
+function isUniversalTarget(value, kind) {
+    const normalized = (value || '').toString().trim().toLowerCase();
+    if (kind === 'grade') {
+        return normalized === 'all grades' || normalized === 'all' || normalized === 'any' || normalized === 'everyone';
+    }
+    return normalized === 'all' || normalized === 'all sections' || normalized === 'any' || normalized === 'everyone';
+}
+
+let completedModuleIds = new Set();
+
 // DOM Modal Elements
 const lessonModal = new bootstrap.Modal(document.getElementById('lessonModal'));
 const lessonModalTitle = document.getElementById('lessonModalTitle');
@@ -35,21 +58,6 @@ const lessonNextBtn = document.getElementById('lesson-next-btn');
 const lessonBackBtn = document.getElementById('lesson-back-btn');
 const lessonFinishBtn = document.getElementById('lesson-finish-btn');
 const closeLessonBtn = document.getElementById('close-lesson-btn');
-
-async function syncPublicLeaderboard(xp, gradeLevel, section, displayName) {
-    try {
-        if (!auth.currentUser) return;
-        await setDoc(doc(db, "leaderboard_public", auth.currentUser.uid), {
-            displayName: displayName || 'Anonymous Learner',
-            xp: Number.isFinite(xp) ? xp : 0,
-            gradeLevel: gradeLevel || 'Unknown',
-            section: section || 'All',
-            updatedAt: serverTimestamp()
-        }, { merge: true });
-    } catch (error) {
-        console.warn("Failed to sync leaderboard profile:", error);
-    }
-}
 
 // Enforce authentication & role
 onAuthStateChanged(auth, async (user) => {
@@ -68,8 +76,6 @@ onAuthStateChanged(auth, async (user) => {
                 
                 const studentGrade = userData.gradeLevel || 'Grade 1'; // Default
                 const studentSection = userData.section || 'All';
-                currentStudentGrade = studentGrade;
-                currentStudentSection = studentSection;
 
                 // Setup Badges
                 const gradeBadge = document.getElementById('student-grade-badge');
@@ -84,11 +90,9 @@ onAuthStateChanged(auth, async (user) => {
                 // --- Gamification: Competence (Points & Progress)
                 currentXP = userData.xp || 0;
                 completedModulesList = userData.completedModules || [];
+                completedModuleIds = buildCompletedModuleIdSet(completedModulesList);
                 xpPoints.textContent = '0';
 
-                // Keep a privacy-safe leaderboard projection in sync.
-                await syncPublicLeaderboard(currentXP, studentGrade, studentSection, studentName);
-                
                 // Animate XP
                 animateValue(xpPoints, 0, currentXP, 1000);
 
@@ -114,8 +118,7 @@ onAuthStateChanged(auth, async (user) => {
                 else if (gradeResult.transmutedGrade >= 75) progressEl.className = 'progress-bar bg-warning';
                 else progressEl.className = 'progress-bar bg-danger';
 
-                // Load Leaderboard and Modules
-                loadLeaderboard(studentGrade, studentSection);
+                // Load Modules
                 loadModules(studentGrade, studentSection);
 
             } else {
@@ -154,8 +157,8 @@ async function loadModules(studentGrade, studentSection) {
             const targetGrade = modData.targetGrade || 'All Grades';
             const targetSection = modData.targetSection ? modData.targetSection.toLowerCase() : 'all';
             
-            const isMatchGrade = targetGrade === 'All Grades' || targetGrade === studentGrade;
-            const isMatchSection = targetSection === 'all' || targetSection === (studentSection ? studentSection.toLowerCase() : '');
+            const isMatchGrade = isUniversalTarget(targetGrade, 'grade') || targetGrade === studentGrade;
+            const isMatchSection = isUniversalTarget(targetSection, 'section') || targetSection === (studentSection ? studentSection.toLowerCase() : '');
             
             if (!isMatchGrade || !isMatchSection) return; // Skip if not meant for this student
 
@@ -185,15 +188,18 @@ async function loadModules(studentGrade, studentSection) {
                     <div class="card-body d-flex flex-column">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <h6 class="mb-0 fw-bold">${modData.title || 'Untitled Module'}</h6>
-                            <span class="badge bg-warning text-dark"><i class="bi bi-star-fill"></i> ${modData.xpReward || 0} XP</span>
+                            <div class="d-flex flex-column align-items-end gap-1">
+                                <span class="badge ${modData.type === 'quiz' ? 'bg-danger' : 'bg-info'} text-white text-uppercase">${modData.type === 'quiz' ? 'Quiz' : 'Lesson'}</span>
+                                <span class="badge bg-warning text-dark"><i class="bi bi-star-fill"></i> ${modData.xpReward || 0} XP</span>
+                            </div>
                         </div>
                         <p class="text-muted small flex-grow-1">${modData.description || 'No description provided.'}</p>
-                        ${savedProgress > 0 && !completedModulesList.includes(modId) ? `
+                        ${savedProgress > 0 && !completedModuleIds.has(modId) ? `
                         <div class="progress mb-2 rounded-pill" style="height: 8px;">
                             <div class="progress-bar bg-info progress-bar-striped progress-bar-animated" role="progressbar" style="width: ${progressPercent}%;"></div>
                         </div>
                         ` : ''}
-                        ${completedModulesList.includes(modId) ? `
+                        ${completedModuleIds.has(modId) ? `
                         <button class="btn btn-sm btn-success text-white w-100 mt-3 complete-mod-btn fw-bold" 
                             data-xp="${modData.xpReward || 0}" 
                             data-id="${modId}" 
@@ -233,7 +239,7 @@ async function loadModules(studentGrade, studentSection) {
                             data-modtype="${modData.type || 'reading'}"
                             data-questions="${encodeURIComponent(JSON.stringify(modData.questions || []))}"
                             data-content="${encodeURIComponent(modData.content || "Oops! The teacher forgot to write the lesson.")}">
-                            <i class="bi bi-play-circle-fill fs-5"></i> Start Learning
+                            <i class="bi bi-play-circle-fill fs-5"></i> ${modData.type === 'quiz' ? 'Take Quiz' : 'Start Learning'}
                         </button>
                         `)}
                     </div>
@@ -274,7 +280,7 @@ function startInteractiveLesson(e) {
     currentLessonImageUrl = encodedImageUrl ? decodeURIComponent(encodedImageUrl) : '';
     currentLessonPdfUrl = encodedPdfUrl ? decodeURIComponent(encodedPdfUrl) : '';
     
-    isReviewMode = completedModulesList.includes(currentModId);
+    isReviewMode = completedModuleIds.has(currentModId);
 
     // Parse the lesson chunks based on whether it is a reading module or a quiz
     if (modType === 'quiz') {
@@ -445,50 +451,62 @@ lessonFinishBtn.addEventListener('click', async () => {
     lessonFinishBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Verifying...`;
     
     try {
+        const userSnap = await getDoc(userDocRef);
+        if (!userSnap.exists()) {
+            throw new Error("User profile not found.");
+        }
+
+        const userData = userSnap.data();
+        const latestCompletedModules = Array.isArray(userData.completedModules) ? userData.completedModules : [];
+        const latestCompletedIds = buildCompletedModuleIdSet(latestCompletedModules);
+
+        // Avoid duplicate rewards if this module was already completed from another tab/session.
+        if (latestCompletedIds.has(currentModId)) {
+            completedModulesList = latestCompletedModules;
+            completedModuleIds = latestCompletedIds;
+            lessonModal.hide();
+            return;
+        }
+
+        const currentModuleTitle = currentLessonCard?.dataset?.title || 'Untitled Module';
+        const gradingCategory = currentLessonCard?.dataset?.gradingcategory || 'none';
+        const completionRecord = {
+            moduleId: currentModId,
+            title: currentModuleTitle,
+            gradingCategory: gradingCategory,
+            score: 0,
+            maxScore: 0,
+            xpAwarded: currentLessonXP,
+            completedAt: serverTimestamp()
+        };
+
+        let scores = userData.scores || { wwRaw: 0, wwMax: 0, ptRaw: 0, ptMax: 0, qaRaw: 0, qaMax: 0 };
+
         if (modType === 'quiz') {
             // === CALCULATE SCORE WITH SCALING ===
-            let rawCorrect = 0;
-            currentLessonChunks.forEach((q, idx) => {
-                const checkedOption = document.querySelector(`input[name="q-${idx}"]:checked`);
-                if (checkedOption) {
-                    const userChoice = parseInt(checkedOption.value, 10);
-                    if(userChoice === q.correctIndex) {
-                        rawCorrect++;
-                    }
-                }
-            });
-
-            // Scale it to the expected Max Score set by the teacher
+            // Scale by teacher-defined max score. Correct-answer validation is handled by teacher review.
             const maxItems = currentLessonChunks.length;
             let expectedMaxScore = maxItems;
             if (currentLessonCard.dataset.maxscore && currentLessonCard.dataset.maxscore !== "undefined") {
                  expectedMaxScore = parseFloat(currentLessonCard.dataset.maxscore);
             }
-            
-            // Example: (5 / 10) * 100 = 50
-            const scaledScore = expectedMaxScore > 0 ? (rawCorrect / maxItems) * expectedMaxScore : rawCorrect;
 
-            // Ensure student has default scores 
-            const userData = (await getDoc(userDocRef)).data();
-            let scores = userData.scores || { wwRaw: 0, wwMax: 0, ptRaw: 0, ptMax: 0, qaRaw: 0, qaMax: 0 };
-            const gradingCategory = currentLessonCard.dataset.gradingcategory || 'none';
+            completionRecord.score = 0;
+            completionRecord.maxScore = expectedMaxScore;
             
-            // Add to DepEd Category if not 'none'
+            // Add only maximum points now. Teachers can override actual score later.
             if (gradingCategory === 'ww') {
-                scores.wwRaw += scaledScore;
                 scores.wwMax += expectedMaxScore;
             } else if (gradingCategory === 'pt') {
-                scores.ptRaw += scaledScore;
                 scores.ptMax += expectedMaxScore;
             } else if (gradingCategory === 'qa') {
-                scores.qaRaw += scaledScore;
                 scores.qaMax += expectedMaxScore;
             }
 
             // Safe database update
             await updateDoc(userDocRef, {
-                xp: increment(currentLessonXP),
-                completedModules: arrayUnion(currentModId),
+                xp: (userData.xp || 0) + currentLessonXP,
+                completedModules: [...latestCompletedModules, completionRecord],
                 scores: scores
             });
 
@@ -497,18 +515,19 @@ lessonFinishBtn.addEventListener('click', async () => {
             lessonContentEl.innerHTML = `
                 <div class="text-center w-100">
                     <h1 class="display-1 mb-3">🎉</h1>
-                    <h2 class="text-success fw-bold">Quiz Complete!</h2>
-                    <h3 class="display-3 fw-bold text-primary mb-3">${scaledScore.toFixed(0)} / ${expectedMaxScore}</h3>
-                    <p class="fs-5 text-muted mb-4">You got ${rawCorrect} out of ${maxItems} items correct.</p>
+                    <h2 class="text-success fw-bold">Quiz Submitted!</h2>
+                    <h3 class="display-6 fw-bold text-primary mb-3">Waiting for teacher review</h3>
+                    <p class="fs-5 text-muted mb-4">Your answers were saved. Your teacher can now finalize your score.</p>
                     <div class="spinner-border text-primary" role="status"></div><br>
-                    <small class="text-muted mt-2 d-inline-block">Syncing score to DepEd Grader...</small>
+                    <small class="text-muted mt-2 d-inline-block">Syncing your progress...</small>
                 </div>
             `;
         } else {
             // Safe database update for reading material (just XP)
             await updateDoc(userDocRef, {
-                xp: increment(currentLessonXP),
-                completedModules: arrayUnion(currentModId)
+                xp: (userData.xp || 0) + currentLessonXP,
+                completedModules: [...latestCompletedModules, completionRecord],
+                scores: scores
             });
         }
         
@@ -516,12 +535,11 @@ lessonFinishBtn.addEventListener('click', async () => {
         localStorage.removeItem('elms_progress_' + currentModId);
         
         // Update Local Arrays & UI
-        completedModulesList.push(currentModId);
+        completedModulesList = [...latestCompletedModules, completionRecord];
+        completedModuleIds = buildCompletedModuleIdSet(completedModulesList);
         let oldXP = currentXP;
-        currentXP += currentLessonXP;
+        currentXP = (userData.xp || 0) + currentLessonXP;
         animateValue(xpPoints, oldXP, currentXP, 1200);
-        await syncPublicLeaderboard(currentXP, currentStudentGrade, currentStudentSection, userGreeting.textContent || 'Anonymous Learner');
-        loadLeaderboard(currentStudentGrade, currentStudentSection);
 
         // Update the card button for Review Mode
         currentLessonCard.disabled = false;
@@ -547,64 +565,6 @@ logoutBtn.addEventListener('click', () => {
         window.location.href = 'index.html';
     });
 });
-
-// --- Gamification: Relatedness (Leaderboard) ---
-// Queries Firestore for top 5 students based on XP
-async function loadLeaderboard() {
-    try {
-        const leaderboardRef = collection(db, "leaderboard_public");
-        // Query only same classroom (grade + section) for privacy-safe leaderboard.
-        // NOTE: Firebase might require a composite index for this query the first time it runs.
-        // If it fails, check the console for a Firebase link to build the index.
-        const q = query(
-            leaderboardRef,
-            where("gradeLevel", "==", currentStudentGrade),
-            where("section", "==", currentStudentSection),
-            orderBy("xp", "desc"),
-            limit(5)
-        );
-        
-        const querySnapshot = await getDocs(q);
-        
-        leaderboardList.innerHTML = ''; // Clear loading state
-        
-        let rank = 1;
-        querySnapshot.forEach((docSnap) => {
-            const data = docSnap.data();
-            const isCurrentUser = auth.currentUser && docSnap.id === auth.currentUser.uid;
-            
-            const li = document.createElement('li');
-            li.className = `list-group-item d-flex justify-content-between align-items-center ${isCurrentUser ? 'bg-light fw-bold' : ''}`;
-            
-            // Medal coloring logic
-            let rankBadge = rank;
-            if(rank === 1) rankBadge = `<i class="bi bi-award-fill text-warning fs-5"></i>`;
-            else if(rank === 2) rankBadge = `<i class="bi bi-award-fill text-secondary fs-5"></i>`;
-            else if(rank === 3) rankBadge = `<i class="bi bi-award-fill text-danger fs-5" style="color: #cd7f32 !important;"></i>`;
-
-            li.innerHTML = `
-                <div class="d-flex align-items-center">
-                    <span class="me-3 text-muted" style="width: 24px; text-align: center;">${rankBadge}</span>
-                    <span>${data.displayName || 'Anonymous Learner'}</span>
-                </div>
-                <span class="badge bg-primary rounded-pill">${data.xp || 0} XP</span>
-            `;
-            leaderboardList.appendChild(li);
-            rank++;
-        });
-
-        if(leaderboardList.innerHTML === '') {
-             leaderboardList.innerHTML = `<li class="list-group-item text-center text-muted">No ranking data yet.</li>`;
-        }
-
-    } catch (error) {
-        console.error("Error loading leaderboard:", error);
-        leaderboardList.innerHTML = `
-            <li class="list-group-item text-center text-danger border-0">
-                <i class="bi bi-exclamation-triangle"></i> Cannot load section leaderboard right now.
-            </li>`;
-    }
-}
 
 // Simple counter animation function
 function animateValue(obj, start, end, duration) {

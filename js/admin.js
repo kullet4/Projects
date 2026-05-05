@@ -82,6 +82,7 @@ createUserForm.addEventListener('submit', async (e) => {
         if(role === 'student') {
             userData.xp = 0;
             userData.completedModules = [];
+            userData.scores = { wwRaw: 0, wwMax: 0, ptRaw: 0, ptMax: 0, qaRaw: 0, qaMax: 0 };
             userData.gradeLevel = document.getElementById('new-user-grade').value || 'Grade 1';
             userData.section = document.getElementById('new-user-section').value || 'All';
         }
@@ -500,6 +501,7 @@ async function deleteModule(moduleId) {
     if(confirm("Are you sure you want to permanently delete this instructional material? This cannot be undone.")) {
         try {
             await deleteDoc(doc(db, "modules", moduleId));
+            await deleteDoc(doc(db, "quiz_keys", moduleId)).catch(() => {});
             await logAction("MODULE_DELETED", `Admin deleted instructional module ID: ${moduleId}`);
             // Re-fetch the data to reflect deletion
             await loadSystemData();
