@@ -1,6 +1,6 @@
 import { auth, db } from './firebase-config.js';
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
-import { doc, getDoc, collection, query, orderBy, getDocs, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+import { onSnapshot, arrayUnion, where, limit, doc, getDoc, collection, query, orderBy, getDocs, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 
 // DOM Elements
 const userGreeting = document.getElementById('user-greeting');
@@ -120,6 +120,7 @@ onAuthStateChanged(auth, async (user) => {
 
                 // Load Modules
                 loadModules(studentGrade, studentSection);
+                listenForNotifications("student", studentGrade);
 
             } else {
                 // Not a student, boot them out
@@ -578,4 +579,125 @@ function animateValue(obj, start, end, duration) {
         }
     };
     window.requestAnimationFrame(step);
+}
+// --- NOTIFICATION SYSTEM ---
+function showToast(title, message, isAlert = false) {
+    const toastContainer = document.getElementById('toastPlacement');
+    if(!toastContainer) return;
+
+    const toastEl = document.createElement('div');
+    toastEl.className = `toast ${isAlert ? 'bg-danger text-white' : 'bg-success text-white'} border-0`;
+    toastEl.setAttribute('role', 'alert');
+    toastEl.setAttribute('aria-live', 'assertive');
+    toastEl.setAttribute('aria-atomic', 'true');
+
+    toastEl.innerHTML = `
+      <div class="toast-header ${isAlert ? 'bg-danger text-white border-light' : 'bg-success text-white border-light'}">
+        <i class="bi ${isAlert ? 'bi-exclamation-circle-fill' : 'bi-bell-fill'} me-2"></i>
+        <strong class="me-auto">${title}</strong>
+        <small>Just now</small>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+      <div class="toast-body">
+        ${message}
+      </div>
+    `;
+
+    toastContainer.appendChild(toastEl);
+    const toastInstance = new bootstrap.Toast(toastEl, { delay: 5000 });
+    toastInstance.show();
+    toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+}
+
+function listenForNotifications(role = "student", gradeLvl = null) {
+    let conditions = [];
+    if(role === "teacher") {
+        conditions = [where("type", "==", "submission")];
+    } else {
+        conditions = [
+            where("type", "==", "new_module")
+        ];
+        // student section could be added here, but keep it broad per grade for now
+        if(gradeLvl) conditions.push(where("targetGrade", "==", gradeLvl));
+    }
+
+    // Notice we use the imported functions from firebase-firestore.js explicitly mapped at the top
+    // query, collection, db, where, orderBy, limit, onSnapshot are needed
+    const q = query(collection(db, "notifications"), ...conditions, orderBy("timestamp", "desc"), limit(10));
+    
+    // Using tracking to prevent initial load from firing toasts
+    let isInitialLoad = true;
+
+    onSnapshot(q, (snapshot) => {
+        const notificationList = document.getElementById('notification-list');
+        const notifBadge = document.getElementById('notif-badge');
+        if(!notificationList || !notifBadge) return;
+        
+        let newCount = 0;
+        let html = `<li><h6 class="dropdown-header">Notifications</h6></li><li><hr class="dropdown-divider"></li>`;
+        
+        if(snapshot.empty) {
+            html += `<li><a class="dropdown-item text-muted text-center py-3" href="#">No new notifications</a></li>`;
+        } else {
+            snapshot.forEach(docSnap => {
+                const data = docSnap.data();
+                // Ensure auth.currentUser exists before checking read property
+                if (!auth.currentUser) return;
+                
+                const isRead = data.readBy && data.readBy.includes(auth.currentUser.uid);
+                if(!isRead) newCount++;
+                
+                html += `<li class="${isRead ? '' : 'bg-light'}">
+                    <a class="dropdown-item py-2 mark-read-btn" href="#" data-id="${docSnap.id}">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-envelope${isRead ? '-open' : '-fill text-primary'} me-2 fs-5"></i>
+                            <div>
+                                <span class="d-block ${isRead ? 'text-muted' : 'fw-bold'}">${data.message || 'Notification'}</span>
+                                <small class="text-muted" style="font-size: 0.75rem;">${data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString() : 'Just now'}</small>
+                            </div>
+                        </div>
+                    </a>
+                </li>`;
+            });
+        }
+
+        notificationList.innerHTML = html;
+
+        if(newCount > 0) {
+            notifBadge.textContent = newCount > 9 ? '9+' : newCount;
+            notifBadge.classList.remove('d-none');
+        } else {
+            notifBadge.classList.add('d-none');
+        }
+
+        // Bind click events to mark as read
+        document.querySelectorAll('.mark-read-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const notifId = btn.getAttribute('data-id');
+                if(!auth.currentUser) return;
+                try {
+                    await updateDoc(doc(db, "notifications", notifId), {
+                        readBy: arrayUnion(auth.currentUser.uid)
+                    });
+                } catch(error) {
+                    console.error("Error marking read:", error);
+                }
+            });
+        });
+
+        // Toast logic for new adds (only fire if NOT initial load)
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === "added" && !isInitialLoad) {
+                const d = change.doc.data();
+                if(!auth.currentUser) return;
+                // Only toast if it hasn't been read by this user
+                if (!d.readBy || !d.readBy.includes(auth.currentUser.uid)) {
+                     showToast("New Activity", d.message || "You have a new update!");
+                }
+            }
+        });
+        
+        isInitialLoad = false;
+    });
 }

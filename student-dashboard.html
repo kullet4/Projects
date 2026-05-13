@@ -27,6 +27,19 @@
                     <li class="nav-item">
                         <span class="nav-link text-white" id="user-greeting">Loading...</span>
                     </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle position-relative" href="#" id="notificationDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-bell-fill"></i>
+                            <span class="position-absolute top-10 start-80 translate-middle p-1 bg-danger border border-light rounded-circle d-none" id="notif-badge">
+                                <span class="visually-hidden">New alerts</span>
+                            </span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="notificationDropdown" id="notification-list" style="width: 300px; max-height: 400px; overflow-y: auto;">
+                            <li><h6 class="dropdown-header">Notifications</h6></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-muted text-center py-3" href="#">No new notifications</a></li>
+                        </ul>
+                    </li>
                     <li class="nav-item">
                         <button id="logout-btn" class="btn btn-outline-light btn-sm ms-3 mt-1">Log Out</button>
                     </li>
@@ -151,6 +164,11 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Toast Container for Notifications -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;" id="toastPlacement">
+        <!-- Toasts injected here -->
     </div>
 
     <!-- Bootstrap JS -->

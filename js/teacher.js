@@ -1,6 +1,6 @@
 import { auth, db } from './firebase-config.js';
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
-import { doc, getDoc, setDoc, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+import { onSnapshot, arrayUnion, orderBy, limit, doc, getDoc, setDoc, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-storage.js";
 
 // DOM Elements
@@ -65,6 +65,7 @@ onAuthStateChanged(auth, async (user) => {
                 
                 // Initialize student load
                 await loadStudentData();
+                listenForNotifications("teacher");
                 btnLoadStudents.addEventListener('click', loadStudentData);
 
             } else {
@@ -754,20 +755,22 @@ if (btnLoadMyModules) {
                     const modTitle = e.currentTarget.getAttribute('data-title');
                     
                     if (confirm(`Are you sure you want to permanently delete "${modTitle}"?\nThis cannot be undone.`)) {
-                        e.currentTarget.disabled = true;
-                        e.currentTarget.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`;
+                        const targetBtn = e.currentTarget;
+                        const rowToRemove = targetBtn.closest('tr');
+                        targetBtn.disabled = true;
+                        targetBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`;
                         try {
                             await deleteDoc(doc(db, "modules", modId));
                             await deleteDoc(doc(db, "quiz_keys", modId)).catch(() => {});
                             await logTeacherAction("MODULE_DELETED", `Teacher deleted module: ${modTitle} (${modId})`);
-                            const rowToRemove = e.currentTarget.closest('tr');
                             rowToRemove.style.opacity = '0.5';
                             rowToRemove.innerHTML = `<td colspan="4" class="text-center text-danger"><i class="bi bi-check-circle"></i> Deleted</td>`;
                             setTimeout(() => rowToRemove.remove(), 1500);
                         } catch (err) {
                             console.error("Error deleting module:", err);
                             alert("Failed to delete module. Check console.");
-                            e.currentTarget.disabled = false;
+                            targetBtn.disabled = false;
+                            targetBtn.innerHTML = `<i class="bi bi-trash3-fill"></i>`;
                         }
                     }
                 });
@@ -779,3 +782,345 @@ if (btnLoadMyModules) {
         }
     });
 }
+// --- NOTIFICATION SYSTEM ---
+function showToast(title, message, isAlert = false) {
+    const toastContainer = document.getElementById('toastPlacement');
+    if(!toastContainer) return;
+
+    const toastEl = document.createElement('div');
+    toastEl.className = `toast ${isAlert ? 'bg-danger text-white' : 'bg-success text-white'} border-0`;
+    toastEl.setAttribute('role', 'alert');
+    toastEl.setAttribute('aria-live', 'assertive');
+    toastEl.setAttribute('aria-atomic', 'true');
+
+    toastEl.innerHTML = `
+      <div class="toast-header ${isAlert ? 'bg-danger text-white border-light' : 'bg-success text-white border-light'}">
+        <i class="bi ${isAlert ? 'bi-exclamation-circle-fill' : 'bi-bell-fill'} me-2"></i>
+        <strong class="me-auto">${title}</strong>
+        <small>Just now</small>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+      <div class="toast-body">
+        ${message}
+      </div>
+    `;
+
+    toastContainer.appendChild(toastEl);
+    const toastInstance = new bootstrap.Toast(toastEl, { delay: 5000 });
+    toastInstance.show();
+    toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+}
+
+function listenForNotifications(role = "student", gradeLvl = null) {
+    let conditions = [];
+    if(role === "teacher") {
+        conditions = [where("type", "==", "submission")];
+    } else {
+        conditions = [
+            where("type", "==", "new_module")
+        ];
+        // student section could be added here, but keep it broad per grade for now
+        if(gradeLvl) conditions.push(where("targetGrade", "==", gradeLvl));
+    }
+
+    // Notice we use the imported functions from firebase-firestore.js explicitly mapped at the top
+    // query, collection, db, where, orderBy, limit, onSnapshot are needed
+    const q = query(collection(db, "notifications"), ...conditions, orderBy("timestamp", "desc"), limit(10));
+    
+    // Using tracking to prevent initial load from firing toasts
+    let isInitialLoad = true;
+
+    onSnapshot(q, (snapshot) => {
+        const notificationList = document.getElementById('notification-list');
+        const notifBadge = document.getElementById('notif-badge');
+        if(!notificationList || !notifBadge) return;
+        
+        let newCount = 0;
+        let html = `<li><h6 class="dropdown-header">Notifications</h6></li><li><hr class="dropdown-divider"></li>`;
+        
+        if(snapshot.empty) {
+            html += `<li><a class="dropdown-item text-muted text-center py-3" href="#">No new notifications</a></li>`;
+        } else {
+            snapshot.forEach(docSnap => {
+                const data = docSnap.data();
+                // Ensure auth.currentUser exists before checking read property
+                if (!auth.currentUser) return;
+                
+                const isRead = data.readBy && data.readBy.includes(auth.currentUser.uid);
+                if(!isRead) newCount++;
+                
+                html += `<li class="${isRead ? '' : 'bg-light'}">
+                    <a class="dropdown-item py-2 mark-read-btn" href="#" data-id="${docSnap.id}">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-envelope${isRead ? '-open' : '-fill text-primary'} me-2 fs-5"></i>
+                            <div>
+                                <span class="d-block ${isRead ? 'text-muted' : 'fw-bold'}">${data.message || 'Notification'}</span>
+                                <small class="text-muted" style="font-size: 0.75rem;">${data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString() : 'Just now'}</small>
+                            </div>
+                        </div>
+                    </a>
+                </li>`;
+            });
+        }
+
+        notificationList.innerHTML = html;
+
+        if(newCount > 0) {
+            notifBadge.textContent = newCount > 9 ? '9+' : newCount;
+            notifBadge.classList.remove('d-none');
+        } else {
+            notifBadge.classList.add('d-none');
+        }
+
+        // Bind click events to mark as read
+        document.querySelectorAll('.mark-read-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const notifId = btn.getAttribute('data-id');
+                if(!auth.currentUser) return;
+                try {
+                    await updateDoc(doc(db, "notifications", notifId), {
+                        readBy: arrayUnion(auth.currentUser.uid)
+                    });
+                } catch(error) {
+                    console.error("Error marking read:", error);
+                }
+            });
+        });
+
+        // Toast logic for new adds (only fire if NOT initial load)
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === "added" && !isInitialLoad) {
+                const d = change.doc.data();
+                if(!auth.currentUser) return;
+                // Only toast if it hasn't been read by this user
+                if (!d.readBy || !d.readBy.includes(auth.currentUser.uid)) {
+                     showToast("New Activity", d.message || "You have a new update!");
+                }
+            }
+        });
+        
+        isInitialLoad = false;
+    });
+}
+// ==========================================
+// ATTENDANCE CHECKER & CSV EXPORT MODULE
+// ==========================================
+
+const attGrade = document.getElementById('att-grade');
+const attSection = document.getElementById('att-section');
+const attDate = document.getElementById('att-date');
+const btnLoadAttendance = document.getElementById('btn-load-attendance');
+const attendanceList = document.getElementById('attendance-list');
+const btnSaveAttendance = document.getElementById('btn-save-attendance');
+const btnExportCSV = document.getElementById('btn-export-csv');
+const attStatusText = document.getElementById('att-status-text');
+const attAlert = document.getElementById('attendance-alert');
+
+let currentAttendanceDocs = []; // Holds current loaded students
+
+// Default to today
+if (attDate) {
+    attDate.valueAsDate = new Date();
+}
+
+if (btnLoadAttendance) {
+    btnLoadAttendance.addEventListener('click', async () => {
+        const grade = attGrade.value;
+        const section = attSection.value.trim();
+        const dateVal = attDate.value;
+        
+        if (!grade || !dateVal) {
+            alert("Please select both Grade and Date.");
+            return;
+        }
+
+        try {
+            btnLoadAttendance.disabled = true;
+            btnLoadAttendance.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Loading...';
+            
+            // 1. Fetch Students
+            const studentsRef = collection(db, "users");
+            let qConstraints = [where("role", "==", "student"), where("gradeLevel", "==", grade)]; // MATCHING db schema 'gradeLevel'
+            if (section && section !== "All") {
+                qConstraints.push(where("section", "==", section));
+            }
+            const q = query(studentsRef, ...qConstraints);
+            const studentSnaps = await getDocs(q);
+            
+            if (studentSnaps.empty) {
+                attendanceList.innerHTML = '<tr><td colspan="2" class="text-center">No students found matching this criteria.</td></tr>';
+                btnSaveAttendance.classList.add('d-none');
+                btnExportCSV.classList.add('d-none');
+                attStatusText.innerText = "No students found.";
+                return;
+            }
+
+            // 2. Fetch existing attendance for this date (so teachers can update it)
+            const attRef = collection(db, "attendance");
+            const attQ = query(attRef, 
+                where("date", "==", dateVal),
+                where("grade", "==", grade),
+                ...(section && section !== "All" ? [where("section", "==", section)] : [])
+            );
+            const existingAttSnaps = await getDocs(attQ);
+            
+            // Build a map of existing statuses: { studentId: "Present" }
+            const existingStatusMap = {};
+            existingAttSnaps.forEach(doc => {
+                const data = doc.data();
+                if (data.studentId && data.status) {
+                    existingStatusMap[data.studentId] = { id: doc.id, status: data.status };
+                }
+            });
+
+            // 3. Render Table
+            attendanceList.innerHTML = '';
+            currentAttendanceDocs = []; // reset
+            
+            studentSnaps.forEach((studentDoc) => {
+                const sData = studentDoc.data();
+                const existing = existingStatusMap[studentDoc.id] || null;
+                const status = existing ? existing.status : 'Present'; // Default to Present
+                
+                // Keep track of docs for saving
+                currentAttendanceDocs.push({
+                    uid: studentDoc.id,
+                    name: sData.name || sData.displayName || "Unknown",
+                    grade: grade,
+                    section: section,
+                    existingDocId: existing ? existing.id : null
+                });
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><div class="fw-bold text-dark">${sData.name || sData.displayName || "Unknown"}</div></td>
+                    <td>
+                        <select class="form-select form-select-sm att-status-select border-${getStatusColor(status)}" data-uid="${studentDoc.id}">
+                            <option value="Present" ${status === 'Present' ? 'selected' : ''}>Present</option>
+                            <option value="Late" ${status === 'Late' ? 'selected' : ''}>Late</option>
+                            <option value="Absent" ${status === 'Absent' ? 'selected' : ''}>Absent</option>
+                        </select>
+                    </td>
+                `;
+                attendanceList.appendChild(tr);
+            });
+
+            // Colorize dropdowns dynamically on change
+            document.querySelectorAll('.att-status-select').forEach(sel => {
+                sel.addEventListener('change', (e) => {
+                    e.target.classList.remove('border-success', 'border-warning', 'border-danger', 'border-secondary');
+                    e.target.classList.add(`border-${getStatusColor(e.target.value)}`);
+                });
+            });
+
+            btnSaveAttendance.classList.remove('d-none');
+            btnExportCSV.classList.remove('d-none');
+            attStatusText.innerText = `Showing ${currentAttendanceDocs.length} students for ${dateVal}`;
+            
+        } catch (err) {
+            console.error(err);
+            alert("Error loading students. See console.");
+        } finally {
+            btnLoadAttendance.disabled = false;
+            btnLoadAttendance.innerHTML = 'Load Class';
+        }
+    });
+}
+
+if (btnSaveAttendance) {
+    btnSaveAttendance.addEventListener('click', async () => {
+        const dateVal = attDate.value;
+        if (!dateVal) return;
+        
+        btnSaveAttendance.disabled = true;
+        btnSaveAttendance.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+
+        try {
+            // Get all dropdowns
+            const selects = document.querySelectorAll('.att-status-select');
+            const batchPromises = [];
+            
+            selects.forEach(sel => {
+                const uid = sel.getAttribute('data-uid');
+                const status = sel.value;
+                const studentMeta = currentAttendanceDocs.find(d => d.uid === uid);
+                
+                if (studentMeta) {
+                    const data = {
+                        studentId: studentMeta.uid,
+                        studentName: studentMeta.name,
+                        date: dateVal,
+                        grade: studentMeta.grade,
+                        section: studentMeta.section,
+                        status: status,
+                        timestamp: serverTimestamp()
+                    };
+
+                    if (studentMeta.existingDocId) {
+                        // Update
+                        batchPromises.push(updateDoc(doc(db, "attendance", studentMeta.existingDocId), { status: status, timestamp: serverTimestamp() }));
+                    } else {
+                        // Create new
+                        const newRef = doc(collection(db, "attendance"));
+                        batchPromises.push(setDoc(newRef, data));
+                        studentMeta.existingDocId = newRef.id; // cache ID in case they hit save again
+                    }
+                }
+            });
+
+            await Promise.all(batchPromises);
+            
+            attAlert.classList.remove('d-none');
+            setTimeout(() => { attAlert.classList.add('d-none'); }, 3000);
+            
+        } catch (err) {
+            console.error(err);
+            alert("Failed to save attendance.");
+        } finally {
+            btnSaveAttendance.disabled = false;
+            btnSaveAttendance.innerHTML = 'Save Attendance';
+        }
+    });
+}
+
+// Export CSV Feature
+if (btnExportCSV) {
+    btnExportCSV.addEventListener('click', () => {
+        const dateValRaw = attDate.value;
+        // Format to MM/DD/YYYY to look better in Excel and fit default column widths
+        const dParts = dateValRaw.split('-');
+        const dateValFormatted = dParts.length === 3 ? `${dParts[1]}/${dParts[2]}/${dParts[0]}` : dateValRaw;
+        
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += "Date,Grade,Section,Student Name,Status\n";
+        
+        const selects = document.querySelectorAll('.att-status-select');
+        selects.forEach(sel => {
+            const uid = sel.getAttribute('data-uid');
+            const status = sel.value;
+            const studentMeta = currentAttendanceDocs.find(d => d.uid === uid);
+            if (studentMeta) {
+                // Escape quotes/commas for CSV safety
+                const safeName = studentMeta.name.replace(/"/g, '""');
+                csvContent += `${dateValFormatted},${studentMeta.grade},${studentMeta.section},"${safeName}",${status}\n`;
+            }
+        });
+        
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Attendance_Class_${dateValRaw}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+}
+
+function getStatusColor(status) {
+    if (status === 'Present') return 'success';
+    if (status === 'Late') return 'warning';
+    if (status === 'Absent') return 'danger';
+    return 'secondary';
+}
+
