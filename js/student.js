@@ -478,7 +478,7 @@ lessonFinishBtn.addEventListener('click', async () => {
             score: 0,
             maxScore: 0,
             xpAwarded: currentLessonXP,
-            completedAt: serverTimestamp()
+            completedAt: new Date().toISOString()
         };
 
         let scores = userData.scores || { wwRaw: 0, wwMax: 0, ptRaw: 0, ptMax: 0, qaRaw: 0, qaMax: 0 };
@@ -514,15 +514,18 @@ lessonFinishBtn.addEventListener('click', async () => {
             // Display Result immediately
             const lessonContentEl = document.getElementById('lesson-chunk-text').parentElement;
             lessonContentEl.innerHTML = `
-                <div class="text-center w-100">
+                <div class="text-center w-100 py-3">
                     <h1 class="display-1 mb-3">🎉</h1>
                     <h2 class="text-success fw-bold">Quiz Submitted!</h2>
-                    <h3 class="display-6 fw-bold text-primary mb-3">Waiting for teacher review</h3>
+                    <h3 class="fs-4 fw-bold text-primary mb-3">Waiting for teacher review</h3>
                     <p class="fs-5 text-muted mb-4">Your answers were saved. Your teacher can now finalize your score.</p>
-                    <div class="spinner-border text-primary" role="status"></div><br>
-                    <small class="text-muted mt-2 d-inline-block">Syncing your progress...</small>
+                    <button type="button" class="btn btn-success btn-lg rounded-pill px-5 mt-3 shadow" data-bs-dismiss="modal">Return to Dashboard</button>
                 </div>
             `;
+            
+            // Hide the default bottom buttons so they don't see the spinner
+            document.getElementById('lesson-nav-buttons').classList.add('d-none');
+            lessonFinishBtn.classList.add('d-none');
         } else {
             // Safe database update for reading material (just XP)
             await updateDoc(userDocRef, {
@@ -548,15 +551,21 @@ lessonFinishBtn.addEventListener('click', async () => {
         currentLessonCard.classList.add('btn-success', 'text-white');
         currentLessonCard.innerHTML = `<i class="bi bi-check2-circle fs-5"></i> Review Lesson`;
 
-        // Close Modal
-        lessonModal.hide();
+        // Only auto-close the modal if it's NOT a quiz. 
+        // For quizzes, the user clicks the "Return to Dashboard" button they just received.
+        if (modType !== 'quiz') {
+            lessonModal.hide();
+        }
+        
+        // Reset the finish button so it's ready for the next modal open
+        lessonFinishBtn.disabled = false;
+        lessonFinishBtn.innerHTML = `🌟 Complete & Earn XP!`;
         
     } catch (error) {
         console.error("Failed to sync XP:", error);
-        lessonFinishBtn.innerHTML = `Error. Try again.`;
-    } finally {
+        lessonFinishBtn.innerHTML = `Error: ${error.message}`;
         lessonFinishBtn.disabled = false;
-        lessonFinishBtn.innerHTML = `🌟 Complete & Earn XP!`;
+        alert("Failed to submit: " + error.message);
     }
 });
 
@@ -623,7 +632,7 @@ function listenForNotifications(role = "student", gradeLvl = null) {
 
     // Notice we use the imported functions from firebase-firestore.js explicitly mapped at the top
     // query, collection, db, where, orderBy, limit, onSnapshot are needed
-    const q = query(collection(db, "notifications"), ...conditions, orderBy("timestamp", "desc"), limit(10));
+    const q = query(collection(db, "notifications"), ...conditions, limit(20));
     
     // Using tracking to prevent initial load from firing toasts
     let isInitialLoad = true;
@@ -639,8 +648,18 @@ function listenForNotifications(role = "student", gradeLvl = null) {
         if(snapshot.empty) {
             html += `<li><a class="dropdown-item text-muted text-center py-3" href="#">No new notifications</a></li>`;
         } else {
-            snapshot.forEach(docSnap => {
-                const data = docSnap.data();
+            // Sort client-side to avoid Firestore composite index requirement
+            let docs = [];
+            snapshot.forEach(docSnap => docs.push({ id: docSnap.id, data: docSnap.data() }));
+            docs.sort((a, b) => {
+                let timeA = a.data.timestamp ? (a.data.timestamp.toDate ? a.data.timestamp.toDate().getTime() : new Date(a.data.timestamp).getTime()) : 0;
+                let timeB = b.data.timestamp ? (b.data.timestamp.toDate ? b.data.timestamp.toDate().getTime() : new Date(b.data.timestamp).getTime()) : 0;
+                return timeB - timeA; // Descending
+            });
+
+            docs.forEach(docObj => {
+                const docSnap = docObj;
+                const data = docSnap.data;
                 // Ensure auth.currentUser exists before checking read property
                 if (!auth.currentUser) return;
                 
@@ -699,5 +718,7 @@ function listenForNotifications(role = "student", gradeLvl = null) {
         });
         
         isInitialLoad = false;
+    }, (error) => {
+        console.error("Notification listener error:", error);
     });
 }

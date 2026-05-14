@@ -825,7 +825,7 @@ function listenForNotifications(role = "student", gradeLvl = null) {
 
     // Notice we use the imported functions from firebase-firestore.js explicitly mapped at the top
     // query, collection, db, where, orderBy, limit, onSnapshot are needed
-    const q = query(collection(db, "notifications"), ...conditions, orderBy("timestamp", "desc"), limit(10));
+    const q = query(collection(db, "notifications"), ...conditions, limit(20));
     
     // Using tracking to prevent initial load from firing toasts
     let isInitialLoad = true;
@@ -841,8 +841,18 @@ function listenForNotifications(role = "student", gradeLvl = null) {
         if(snapshot.empty) {
             html += `<li><a class="dropdown-item text-muted text-center py-3" href="#">No new notifications</a></li>`;
         } else {
-            snapshot.forEach(docSnap => {
-                const data = docSnap.data();
+            // Sort client-side to avoid Firestore composite index requirement
+            let docs = [];
+            snapshot.forEach(docSnap => docs.push({ id: docSnap.id, data: docSnap.data() }));
+            docs.sort((a, b) => {
+                let timeA = a.data.timestamp ? (a.data.timestamp.toDate ? a.data.timestamp.toDate().getTime() : new Date(a.data.timestamp).getTime()) : 0;
+                let timeB = b.data.timestamp ? (b.data.timestamp.toDate ? b.data.timestamp.toDate().getTime() : new Date(b.data.timestamp).getTime()) : 0;
+                return timeB - timeA; // Descending
+            });
+
+            docs.forEach(docObj => {
+                const docSnap = docObj;
+                const data = docSnap.data;
                 // Ensure auth.currentUser exists before checking read property
                 if (!auth.currentUser) return;
                 
@@ -901,6 +911,8 @@ function listenForNotifications(role = "student", gradeLvl = null) {
         });
         
         isInitialLoad = false;
+    }, (error) => {
+        console.error("Notification listener error:", error);
     });
 }
 // ==========================================
