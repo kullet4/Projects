@@ -174,6 +174,16 @@ createModuleForm.addEventListener('submit', async (e) => {
             status: 'active'
         });
 
+        // Notify students about the new module
+        await addDoc(collection(db, "notifications"), {
+            type: "new_module",
+            message: `New reading posted: ${title}`,
+            targetGrade: gradeLevel,
+            targetSection: section, // Included for future filtering if needed
+            timestamp: serverTimestamp(),
+            readBy: []
+        });
+
         moduleAlert.classList.remove('d-none');
         createModuleForm.reset();
         setTimeout(() => moduleAlert.classList.add('d-none'), 4000);
@@ -251,6 +261,16 @@ if(createQuizForm) {
                 answers: answerKey,
                 createdAt: serverTimestamp(),
                 teacherId: auth.currentUser.uid
+            });
+
+            // Notify students about the new module
+            await addDoc(collection(db, "notifications"), {
+                type: "new_module",
+                message: `New quiz posted: ${title}`,
+                targetGrade: gradeLevel,
+                targetSection: section, // Included for future filtering if needed
+                timestamp: serverTimestamp(),
+                readBy: []
             });
 
             quizAlert.classList.remove('d-none');

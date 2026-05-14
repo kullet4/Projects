@@ -1,6 +1,6 @@
 import { auth, db } from './firebase-config.js';
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
-import { onSnapshot, arrayUnion, where, limit, doc, getDoc, collection, query, orderBy, getDocs, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+import { onSnapshot, arrayUnion, where, limit, doc, getDoc, collection, query, orderBy, getDocs, updateDoc, serverTimestamp, addDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 
 // DOM Elements
 const userGreeting = document.getElementById('user-greeting');
@@ -509,6 +509,14 @@ lessonFinishBtn.addEventListener('click', async () => {
                 xp: (userData.xp || 0) + currentLessonXP,
                 completedModules: [...latestCompletedModules, completionRecord],
                 scores: scores
+            });
+
+            // Notify Teacher about submission
+            await addDoc(collection(db, "notifications"), {
+                type: "submission",
+                message: `${userData.name || 'A student'} submitted quiz: ${currentModuleTitle}`,
+                timestamp: serverTimestamp(),
+                readBy: []
             });
 
             // Display Result immediately
