@@ -12,6 +12,22 @@ let currentXP = 0;
 let userDocRef = null;
 let completedModulesList = [];
 
+// Avatar System
+const AVATAR_ROSTER = [
+    { id: 'base_user', icon: '👤', name: 'Base User', cost: 0 },
+    { id: 'baby_chick', icon: '🐣', name: 'Baby Chick', cost: 100 },
+    { id: 'turtle', icon: '🐢', name: 'Turtle', cost: 250 },
+    { id: 'fox', icon: '🦊', name: 'Clever Fox', cost: 500 },
+    { id: 'bear', icon: '🐻', name: 'Brave Bear', cost: 750 },
+    { id: 'panda', icon: '🐼', name: 'Panda', cost: 1000 },
+    { id: 'lion', icon: '🦁', name: 'Fierce Lion', cost: 1500 },
+    { id: 'alien', icon: '👽', name: 'Mystic Alien', cost: 3000 },
+    { id: 'robot', icon: '🤖', name: 'Mecha Robot', cost: 5000 }
+];
+let equippedAvatar = 'base_user';
+let unlockedAvatars = ['base_user'];
+let shopSelectedAvatarId = null;
+
 // Gamification Modal Variables
 let currentLessonChunks = [];
 let currentChunkIndex = 0;
@@ -76,6 +92,11 @@ onAuthStateChanged(auth, async (user) => {
                 
                 const studentGrade = userData.gradeLevel || 'Grade 1'; // Default
                 const studentSection = userData.section || 'All';
+
+                // Setup Avatar
+                equippedAvatar = userData.equippedAvatar || 'base_user';
+                unlockedAvatars = userData.unlockedAvatars || ['base_user'];
+                updateNavAvatar();
 
                 // Setup Badges
                 const gradeBadge = document.getElementById('student-grade-badge');
@@ -151,6 +172,14 @@ async function loadModules(studentGrade, studentSection) {
             return;
         }
         
+        // 1. Create a Bucket for each grading category
+        const moduleBuckets = {
+            'ww': { title: 'Written Works', items: [] },
+            'pt': { title: 'Performance Tasks', items: [] },
+            'qa': { title: 'Quarterly Assessments', items: [] },
+            'other': { title: 'Other Activities', items: [] } 
+        };
+        
         querySnapshot.forEach((docSnap) => {
             const modData = docSnap.data();
             
@@ -177,81 +206,116 @@ async function loadModules(studentGrade, studentSection) {
                 progressPercent = Math.min(99, Math.floor((savedProgress / totalChunks) * 100));
             }
 
-            // Randomize a pastel color block for the module banner to make it playful
-            const colors = ['#ffdac1', '#a1c4fd', '#fbc2eb', '#fdcbf1', '#e0c3fc'];
-            const randomColor = colors[Math.floor(Math.random() * colors.length)];
-
-            const col = document.createElement('div');
-            col.className = 'col-md-6';
-            col.innerHTML = `
-                <div class="card shadow-sm border-0 h-100 module-card overflow-hidden">
-                    <div style="height: 10px; background: ${randomColor};"></div>
-                    <div class="card-body d-flex flex-column">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <h6 class="mb-0 fw-bold">${modData.title || 'Untitled Module'}</h6>
-                            <div class="d-flex flex-column align-items-end gap-1">
-                                <span class="badge ${modData.type === 'quiz' ? 'bg-danger' : 'bg-info'} text-white text-uppercase">${modData.type === 'quiz' ? 'Quiz' : 'Lesson'}</span>
-                                <span class="badge bg-warning text-dark"><i class="bi bi-star-fill"></i> ${modData.xpReward || 0} XP</span>
-                            </div>
-                        </div>
-                        <p class="text-muted small flex-grow-1">${modData.description || 'No description provided.'}</p>
-                        ${savedProgress > 0 && !completedModuleIds.has(modId) ? `
-                        <div class="progress mb-2 rounded-pill" style="height: 8px;">
-                            <div class="progress-bar bg-info progress-bar-striped progress-bar-animated" role="progressbar" style="width: ${progressPercent}%;"></div>
-                        </div>
-                        ` : ''}
-                        ${completedModuleIds.has(modId) ? `
-                        <button class="btn btn-sm btn-success text-white w-100 mt-3 complete-mod-btn fw-bold" 
-                            data-xp="${modData.xpReward || 0}" 
-                            data-id="${modId}" 
-                            data-title="${modData.title}" 
-                            data-gradingcategory="${modData.gradingCategory}"
-                            data-maxscore="${modData.maxScore}"
-                            data-imageurl="${encodeURIComponent(modData.imageUrl || '')}"
-                            data-pdfurl="${encodeURIComponent(modData.pdfUrl || '')}"
-                            data-modtype="${modData.type || 'reading'}"
-                            data-questions="${encodeURIComponent(JSON.stringify(modData.questions || []))}"
-                            data-content="${encodeURIComponent(modData.content || "Oops! The teacher forgot to write the lesson.")}">
-                            <i class="bi bi-check2-circle fs-5"></i> Review Lesson
-                        </button>
-                        ` : (savedProgress > 0 ? `
-                        <button class="btn btn-sm btn-info text-white w-100 mt-2 complete-mod-btn fw-bold" 
-                            data-xp="${modData.xpReward || 0}" 
-                            data-id="${modId}" 
-                            data-title="${modData.title}" 
-                            data-gradingcategory="${modData.gradingCategory}"
-                            data-maxscore="${modData.maxScore}"
-                            data-imageurl="${encodeURIComponent(modData.imageUrl || '')}"
-                            data-pdfurl="${encodeURIComponent(modData.pdfUrl || '')}"
-                            data-modtype="${modData.type || 'reading'}"
-                            data-questions="${encodeURIComponent(JSON.stringify(modData.questions || []))}"
-                            data-content="${encodeURIComponent(modData.content || "Oops! The teacher forgot to write the lesson.")}">
-                            <i class="bi bi-play-circle-fill fs-5"></i> Continue (${progressPercent}%)
-                        </button>
-                        ` : `
-                        <button class="btn btn-sm btn-outline-primary w-100 mt-3 complete-mod-btn fw-bold" 
-                            data-xp="${modData.xpReward || 0}" 
-                            data-id="${modId}" 
-                            data-title="${modData.title}" 
-                            data-gradingcategory="${modData.gradingCategory}"
-                            data-maxscore="${modData.maxScore}"
-                            data-imageurl="${encodeURIComponent(modData.imageUrl || '')}"
-                            data-pdfurl="${encodeURIComponent(modData.pdfUrl || '')}"
-                            data-modtype="${modData.type || 'reading'}"
-                            data-questions="${encodeURIComponent(JSON.stringify(modData.questions || []))}"
-                            data-content="${encodeURIComponent(modData.content || "Oops! The teacher forgot to write the lesson.")}">
-                            <i class="bi bi-play-circle-fill fs-5"></i> ${modData.type === 'quiz' ? 'Take Quiz' : 'Start Learning'}
-                        </button>
-                        `)}
-                    </div>
-                </div>
-            `;
-            learningModules.appendChild(col);
+            const category = modData.gradingCategory || 'other';
+            const bucketKey = moduleBuckets[category] ? category : 'other';
+            moduleBuckets[bucketKey].items.push({ id: modId, data: modData, savedProgress, progressPercent });
         });
 
         if (modulesAdded === 0) {
             learningModules.innerHTML = `<div class="col-12"><p class="text-muted">No learning modules assigned to your Grade/Section yet. Choose an 'All Grades' module or ask your teacher.</p></div>`;
+            return;
         }
+
+        // 3. Build the Accordion HTML
+        let accordionHTML = '<div class="accordion w-100" id="modulesAccordion">';
+        let index = 0;
+
+        for (const [catKey, bucket] of Object.entries(moduleBuckets)) {
+            if (bucket.items.length === 0) continue; // Skip empty categories
+            
+            const showClass = index === 0 ? 'show' : ''; // Open the first one by default
+            const collapsedClass = index === 0 ? '' : 'collapsed';
+            
+            let listItemsHTML = '<ul class="list-group list-group-flush rounded-bottom">';
+            bucket.items.forEach(item => {
+                const isCompleted = completedModuleIds.has(item.id);
+                const modData = item.data;
+                const iconClass = modData.type === 'quiz' ? 'bi-patch-question-fill text-danger' : 'bi-file-earmark-text-fill text-primary';
+                
+                // Button HTML based on state
+                let actionBtnHTML = '';
+                const btnDataAttrs = `data-xp="${modData.xpReward || 0}" data-id="${item.id}" data-title="${modData.title}" data-gradingcategory="${modData.gradingCategory}" data-maxscore="${modData.maxScore}" data-imageurl="${encodeURIComponent(modData.imageUrl || '')}" data-pdfurl="${encodeURIComponent(modData.pdfUrl || '')}" data-modtype="${modData.type || 'reading'}" data-questions="${encodeURIComponent(JSON.stringify(modData.questions || []))}" data-content="${encodeURIComponent(modData.content || "Oops! The teacher forgot to write the lesson.")}"`;
+
+                if (isCompleted) {
+                    if (modData.type === 'quiz') {
+                        // Find the completed record to display the score
+                        let scoreLabel = '';
+                        const record = completedModulesList.find(r => getCompletedModuleId(r) === item.id);
+                        if (record && record.maxScore && record.maxScore > 0) {
+                            scoreLabel = `<span class="badge bg-warning text-dark me-2">Score: ${record.score}/${record.maxScore}</span>`;
+                        }
+                        
+                        // Disable the button entirely for completed Quizzes to prevent re-viewing questions
+                        actionBtnHTML = `
+                            <div class="d-flex align-items-center">
+                                ${scoreLabel}
+                                <button class="btn btn-sm btn-success text-white fw-bold d-flex align-items-center" disabled>
+                                    <i class="bi bi-shield-check me-1"></i> Completed
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        // Allow reviewing for Lessons/Reading Material
+                        actionBtnHTML = `
+                            <button class="btn btn-sm btn-success text-white complete-mod-btn fw-bold d-flex align-items-center" ${btnDataAttrs}>
+                                <i class="bi bi-book-half me-1"></i> Review
+                            </button>
+                        `;
+                    }
+                } else if (item.savedProgress > 0) {
+                    actionBtnHTML = `
+                        <button class="btn btn-sm btn-info text-white complete-mod-btn fw-bold d-flex align-items-center" ${btnDataAttrs}>
+                            <i class="bi bi-play-circle-fill me-1"></i> ( ${item.progressPercent}% )
+                        </button>
+                    `;
+                } else {
+                    actionBtnHTML = `
+                        <button class="btn btn-sm btn-outline-primary complete-mod-btn fw-bold d-flex align-items-center" ${btnDataAttrs}>
+                            <i class="bi bi-play-circle-fill me-1"></i> Start
+                        </button>
+                    `;
+                }
+
+                // If a PDF URL is present, create a link directly beneath the title
+                let pdfLinkHTML = '';
+                if (modData.pdfUrl && modData.pdfUrl.trim() !== '') {
+                    pdfLinkHTML = `<br><a href="${modData.pdfUrl}" target="_blank" class="text-secondary small text-decoration-none mt-1 d-inline-block"><i class="bi bi-link-45deg"></i> View Attachment PDF</a>`;
+                }
+
+                listItemsHTML += `
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-3 bg-white">
+                        <div class="pe-3">
+                            <h6 class="mb-0 text-dark fw-bold"><i class="${iconClass} me-2 fs-5 align-middle"></i> ${modData.title || 'Untitled Module'}</h6>
+                            ${pdfLinkHTML}
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="badge bg-warning text-dark"><i class="bi bi-star-fill align-middle"></i> ${modData.xpReward || 0} XP</span>
+                            ${actionBtnHTML}
+                        </div>
+                    </li>
+                `;
+            });
+            listItemsHTML += '</ul>';
+
+            accordionHTML += `
+                <div class="accordion-item shadow-sm border-0 mb-3 rounded" style="overflow: hidden;">
+                    <h2 class="accordion-header" id="heading${catKey}">
+                        <button class="accordion-button ${collapsedClass} fw-bold text-dark bg-light" type="button" data-bs-toggle="collapse" data-bs-target="#collapse${catKey}" aria-expanded="${index === 0 ? 'true' : 'false'}" aria-controls="collapse${catKey}">
+                            ${bucket.title} <span class="badge bg-secondary ms-2">${bucket.items.length}</span>
+                        </button>
+                    </h2>
+                    <div id="collapse${catKey}" class="accordion-collapse collapse ${showClass}" aria-labelledby="heading${catKey}" data-bs-parent="#modulesAccordion">
+                        <div class="accordion-body p-0 border-top bg-white">
+                            ${listItemsHTML}
+                        </div>
+                    </div>
+                </div>
+            `;
+            index++;
+        }
+        accordionHTML += '</div>';
+
+        learningModules.innerHTML = accordionHTML;
 
         // Add click events to start lesson buttons
         document.querySelectorAll('.complete-mod-btn').forEach(btn => {
@@ -554,10 +618,22 @@ lessonFinishBtn.addEventListener('click', async () => {
         animateValue(xpPoints, oldXP, currentXP, 1200);
 
         // Update the card button for Review Mode
-        currentLessonCard.disabled = false;
-        currentLessonCard.classList.remove('btn-outline-primary');
-        currentLessonCard.classList.add('btn-success', 'text-white');
-        currentLessonCard.innerHTML = `<i class="bi bi-check2-circle fs-5"></i> Review Lesson`;
+        if (modType === 'quiz') {
+            const parent = currentLessonCard.parentElement;
+            parent.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <span class="badge bg-warning text-dark me-2">Score: 0/${completionRecord.maxScore}</span>
+                    <button class="btn btn-sm btn-success text-white fw-bold d-flex align-items-center" disabled>
+                        <i class="bi bi-shield-check me-1"></i> Completed
+                    </button>
+                </div>
+            `;
+        } else {
+            currentLessonCard.disabled = false;
+            currentLessonCard.classList.remove('btn-outline-primary', 'btn-info');
+            currentLessonCard.classList.add('btn-success', 'text-white');
+            currentLessonCard.innerHTML = `<i class="bi bi-book-half me-1"></i> Review`;
+        }
 
         // Only auto-close the modal if it's NOT a quiz. 
         // For quizzes, the user clicks the "Return to Dashboard" button they just received.
@@ -728,5 +804,146 @@ function listenForNotifications(role = "student", gradeLvl = null) {
         isInitialLoad = false;
     }, (error) => {
         console.error("Notification listener error:", error);
+    });
+}
+
+// ==============
+// Avatar System
+// ==============
+
+function updateNavAvatar() {
+    const navIcon = document.getElementById('nav-equipped-avatar');
+    if (!navIcon) return;
+    const avatar = AVATAR_ROSTER.find(a => a.id === equippedAvatar) || AVATAR_ROSTER[0];
+    navIcon.textContent = avatar.icon;
+}
+
+function renderAvatarShop() {
+    const grid = document.getElementById('avatar-grid');
+    const coinsDisplay = document.getElementById('shop-coins-display');
+    if (!grid || !coinsDisplay) return;
+
+    coinsDisplay.textContent = currentXP + ' 🪙';
+
+    grid.innerHTML = AVATAR_ROSTER.map(avatar => {
+        const isUnlocked = unlockedAvatars.includes(avatar.id);
+        const isEquipped = equippedAvatar === avatar.id;
+        
+        let statusBadge = '';
+        if (isEquipped) statusBadge = `<span class="badge bg-success position-absolute top-0 end-0 m-2"><i class="bi bi-check-circle"></i></span>`;
+        else if (isUnlocked) statusBadge = `<span class="badge bg-secondary position-absolute top-0 end-0 m-2">Owned</span>`;
+        else statusBadge = `<span class="badge bg-dark border border-secondary position-absolute top-0 end-0 m-2"><i class="bi bi-lock-fill text-warning"></i> ${avatar.cost}</span>`;
+
+        const borderClass = shopSelectedAvatarId === avatar.id ? 'border-primary border-2' : 'border-secondary';
+        const opacityClass = isUnlocked ? '' : 'opacity-50';
+
+        return `
+            <div class="col-4 col-sm-3">
+                <div class="card bg-dark text-white cursor-pointer avatar-card position-relative ${borderClass} h-100" data-id="${avatar.id}">
+                    ${statusBadge}
+                    <div class="card-body text-center p-2 d-flex flex-column align-items-center justify-content-center ${opacityClass}">
+                        <div style="font-size: 2.5rem; line-height: 1;">${avatar.icon}</div>
+                        <small class="d-block mt-2 text-truncate w-100" style="font-size: 0.75rem;">${avatar.name}</small>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Update Left Preview Panel
+    const previewIcon = document.getElementById('avatar-preview-icon');
+    const previewName = document.getElementById('avatar-preview-name');
+    const previewStatus = document.getElementById('avatar-preview-status');
+    const btnSave = document.getElementById('btn-save-avatar');
+
+    if (previewIcon && previewName && btnSave && shopSelectedAvatarId) {
+        const selected = AVATAR_ROSTER.find(a => a.id === shopSelectedAvatarId) || AVATAR_ROSTER[0];
+        previewIcon.textContent = selected.icon;
+        previewName.textContent = selected.name;
+        
+        const isUnlocked = unlockedAvatars.includes(shopSelectedAvatarId);
+        const isEquipped = equippedAvatar === shopSelectedAvatarId;
+
+        if (isEquipped) {
+            previewStatus.innerHTML = `<span class="text-success"><i class="bi bi-check-circle"></i> Equipped</span>`;
+            btnSave.disabled = true;
+            btnSave.className = 'btn btn-success fw-bold';
+            btnSave.textContent = 'Equipped';
+        } else if (isUnlocked) {
+            previewStatus.innerHTML = `<span class="text-info">Owned</span>`;
+            btnSave.disabled = false;
+            btnSave.className = 'btn btn-primary fw-bold';
+            btnSave.textContent = 'Equip Avatar';
+        } else {
+            previewStatus.innerHTML = `<span class="text-warning"><i class="bi bi-lock-fill"></i> Cost: ${selected.cost} 🪙</span>`;
+            btnSave.disabled = currentXP < selected.cost;
+            btnSave.className = 'btn btn-warning text-dark fw-bold';
+            btnSave.textContent = `Buy for ${selected.cost} 🪙`;
+        }
+    }
+
+    // Attach click events
+    document.querySelectorAll('.avatar-card').forEach(card => {
+        card.addEventListener('click', () => {
+            shopSelectedAvatarId = card.getAttribute('data-id');
+            renderAvatarShop();
+        });
+    });
+}
+
+// Event Listeners for Shop
+const avatarMenuTriggers = document.querySelectorAll('[data-bs-target="#avatarModal"]');
+avatarMenuTriggers.forEach(el => {
+    el.addEventListener('click', () => {
+        shopSelectedAvatarId = equippedAvatar; // Default to currently equipped
+        renderAvatarShop();
+    });
+});
+
+const btnSaveAvatar = document.getElementById('btn-save-avatar');
+if (btnSaveAvatar) {
+    btnSaveAvatar.addEventListener('click', async () => {
+        const selected = AVATAR_ROSTER.find(a => a.id === shopSelectedAvatarId);
+        if (!selected) return;
+
+        btnSaveAvatar.disabled = true;
+        btnSaveAvatar.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Processing...`;
+
+        try {
+            const isUnlocked = unlockedAvatars.includes(shopSelectedAvatarId);
+            let payload = {};
+
+            if (isUnlocked) {
+                // Just Equip
+                equippedAvatar = shopSelectedAvatarId;
+                payload = { equippedAvatar: equippedAvatar };
+            } else {
+                // Buy
+                if (currentXP < selected.cost) throw new Error("Not enough coins!");
+                currentXP -= selected.cost;
+                unlockedAvatars.push(shopSelectedAvatarId);
+                equippedAvatar = shopSelectedAvatarId;
+                
+                payload = {
+                    xp: currentXP,
+                    unlockedAvatars: unlockedAvatars,
+                    equippedAvatar: equippedAvatar
+                };
+            }
+
+            // Sync to firestore
+            await updateDoc(userDocRef, payload);
+            
+            // Update UI globally
+            updateNavAvatar();
+            xpPoints.textContent = currentXP;
+            renderAvatarShop();
+            
+            showToast("Avatar Updated", `You are now using the ${selected.name} avatar!`);
+        } catch (err) {
+            console.error(err);
+            alert(err.message);
+            renderAvatarShop(); // Reset btn
+        }
     });
 }
