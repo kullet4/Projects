@@ -224,7 +224,8 @@ if(createQuizForm) {
             const correctIndex = parseInt(card.querySelector('.q-ans').value, 10);
             questions.push({
                 question,
-                options
+                options,
+                correctAnswer: correctIndex // Storing the correct answer choice
             });
             answerKey.push(correctIndex);
         });

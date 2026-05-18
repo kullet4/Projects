@@ -245,11 +245,10 @@ async function loadModules(studentGrade, studentSection) {
                             scoreLabel = `<span class="badge bg-warning text-dark me-2">Score: ${record.score}/${record.maxScore}</span>`;
                         }
                         
-                        // Disable the button entirely for completed Quizzes to prevent re-viewing questions
                         actionBtnHTML = `
                             <div class="d-flex align-items-center">
                                 ${scoreLabel}
-                                <button class="btn btn-sm btn-success text-white fw-bold d-flex align-items-center" disabled>
+                                <button class="btn btn-sm btn-success text-white fw-bold d-flex align-items-center view-summary-btn" data-title="${modData.title}" data-score="${record ? record.score : 0}" data-maxscore="${record ? record.maxScore : 0}" data-coins="${modData.xpReward || 0}">
                                     <i class="bi bi-shield-check me-1"></i> Completed
                                 </button>
                             </div>
@@ -320,6 +319,19 @@ async function loadModules(studentGrade, studentSection) {
         // Add click events to start lesson buttons
         document.querySelectorAll('.complete-mod-btn').forEach(btn => {
             btn.addEventListener('click', startInteractiveLesson);
+        });
+
+        // Add click events for quiz summary buttons
+        document.querySelectorAll('.view-summary-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const b = e.currentTarget;
+                document.getElementById('summary-modal-title').textContent = b.getAttribute('data-title');
+                document.getElementById('summary-modal-score').textContent = `${b.getAttribute('data-score')} / ${b.getAttribute('data-maxscore')}`;
+                document.getElementById('summary-modal-coins').textContent = `+${b.getAttribute('data-coins')} 🪙`;
+                
+                const summaryModal = new bootstrap.Modal(document.getElementById('summaryModal'));
+                summaryModal.show();
+            });
         });
 
     } catch (error) {
@@ -479,6 +491,15 @@ lessonNextBtn.addEventListener('click', () => {
 // Back Button Handler
 lessonBackBtn.addEventListener('click', () => {
     if(currentChunkIndex > 0) {
+        // Save answer state before going back
+        const modType = currentLessonCard ? currentLessonCard.getAttribute('data-modtype') : 'reading';
+        if (modType === 'quiz') {
+            const checkedOption = document.querySelector(`input[name="q-${currentChunkIndex}"]:checked`);
+            if (checkedOption) {
+                userAnswers[currentChunkIndex] = parseInt(checkedOption.value, 10);
+            }
+        }
+        
         currentChunkIndex--;
         animateChunkChange();
     }
@@ -510,6 +531,8 @@ lessonFinishBtn.addEventListener('click', async () => {
             alert("Please select an answer before finishing the quiz!");
             return;
         }
+        // Save the very last question's answer into the userAnswers object
+        userAnswers[currentChunkIndex] = parseInt(checkedOption.value, 10);
     }
 
     lessonFinishBtn.disabled = true;
@@ -548,23 +571,52 @@ lessonFinishBtn.addEventListener('click', async () => {
         let scores = userData.scores || { wwRaw: 0, wwMax: 0, ptRaw: 0, ptMax: 0, qaRaw: 0, qaMax: 0 };
 
         if (modType === 'quiz') {
-            // === CALCULATE SCORE WITH SCALING ===
-            // Scale by teacher-defined max score. Correct-answer validation is handled by teacher review.
+            // === AUTO-SCORE CALCULATION ===
+            let correctCount = 0;
+            const hasEmbeddedAnswers = currentLessonChunks.length > 0 && currentLessonChunks[0].correctAnswer !== undefined;
+
+            if (hasEmbeddedAnswers) {
+                for (let i = 0; i < currentLessonChunks.length; i++) {
+                    if (userAnswers[i] !== undefined && userAnswers[i] === currentLessonChunks[i].correctAnswer) {
+                        correctCount++;
+                    }
+                }
+            } else {
+                try {
+                    const keySnap = await getDoc(doc(db, "quiz_keys", currentModId));
+                    if (keySnap.exists()) {
+                        const answerKey = keySnap.data().answers || [];
+                        for (let i = 0; i < currentLessonChunks.length; i++) {
+                            if (userAnswers[i] !== undefined && userAnswers[i] === answerKey[i]) {
+                                correctCount++;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("Could not fetch quiz keys due to rules/permissions.", e);
+                }
+            }
+
+            // Scale by teacher-defined max score.
             const maxItems = currentLessonChunks.length;
             let expectedMaxScore = maxItems;
             if (currentLessonCard.dataset.maxscore && currentLessonCard.dataset.maxscore !== "undefined") {
                  expectedMaxScore = parseFloat(currentLessonCard.dataset.maxscore);
             }
 
-            completionRecord.score = 0;
+            const scaledScore = maxItems > 0 ? Math.round((correctCount / maxItems) * expectedMaxScore) : 0;
+
+            completionRecord.score = scaledScore;
             completionRecord.maxScore = expectedMaxScore;
             
-            // Add only maximum points now. Teachers can override actual score later.
             if (gradingCategory === 'ww') {
+                scores.wwRaw = (scores.wwRaw || 0) + scaledScore;
                 scores.wwMax += expectedMaxScore;
             } else if (gradingCategory === 'pt') {
+                scores.ptRaw = (scores.ptRaw || 0) + scaledScore;
                 scores.ptMax += expectedMaxScore;
             } else if (gradingCategory === 'qa') {
+                scores.qaRaw = (scores.qaRaw || 0) + scaledScore;
                 scores.qaMax += expectedMaxScore;
             }
 
@@ -578,7 +630,7 @@ lessonFinishBtn.addEventListener('click', async () => {
             // Notify Teacher about submission
             await addDoc(collection(db, "notifications"), {
                 type: "submission",
-                message: `${userData.name || 'A student'} submitted quiz: ${currentModuleTitle}`,
+                message: `${userData.name || 'A student'} scored ${scaledScore}/${expectedMaxScore} on quiz: ${currentModuleTitle}`,
                 timestamp: serverTimestamp(),
                 readBy: []
             });
@@ -587,11 +639,29 @@ lessonFinishBtn.addEventListener('click', async () => {
             const lessonContentEl = document.getElementById('lesson-chunk-text').parentElement;
             lessonContentEl.innerHTML = `
                 <div class="text-center w-100 py-3">
-                    <h1 class="display-1 mb-3">🎉</h1>
-                    <h2 class="text-success fw-bold">Quiz Submitted!</h2>
-                    <h3 class="fs-4 fw-bold text-primary mb-3">Waiting for teacher review</h3>
-                    <p class="fs-5 text-muted mb-4">Your answers were saved. Your teacher can now finalize your score.</p>
-                    <button type="button" class="btn btn-success btn-lg rounded-pill px-5 mt-3 shadow" data-bs-dismiss="modal">Return to Dashboard</button>
+                    <h1 class="display-1 mb-2">🎉</h1>
+                    <h2 class="text-success fw-bold mb-1">Quiz Completed!</h2>
+                    <p class="text-muted fw-bold mb-4">${currentModuleTitle}</p>
+                    
+                    <div class="row justify-content-center mb-4 g-3">
+                        <div class="col-6">
+                            <div class="card bg-light border-0 shadow-sm h-100">
+                                <div class="card-body p-3 d-flex flex-column justify-content-center">
+                                    <h4 class="fw-bold text-primary mb-0">${scaledScore} / ${expectedMaxScore}</h4>
+                                    <small class="text-muted text-uppercase">Score</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="card bg-light border-0 shadow-sm h-100">
+                                <div class="card-body p-3 d-flex flex-column justify-content-center">
+                                    <h4 class="fw-bold text-warning mb-0">+${currentLessonXP} 🪙</h4>
+                                    <small class="text-muted text-uppercase">Earned</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-success btn-lg rounded-pill px-5 mt-2 shadow" data-bs-dismiss="modal">Return to Dashboard</button>
                 </div>
             `;
             
